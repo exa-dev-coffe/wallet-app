@@ -1,0 +1,49 @@
+package com.time_tracker.be.balance;
+
+import com.time_tracker.be.balance.dto.BalanceResponseDto;
+import com.time_tracker.be.exception.BadRequestException;
+import com.time_tracker.be.exception.NotFoundException;
+import com.time_tracker.be.utils.PasswordUtils;
+import com.time_tracker.be.utils.commons.ResponseModel;
+import jakarta.transaction.Transactional;
+import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Service;
+
+@Service
+public class BalanceService {
+    private final BalanceRepository balanceRepository;
+
+    public BalanceService(BalanceRepository balanceRepository) {
+        this.balanceRepository = balanceRepository;
+    }
+
+    public ResponseEntity<ResponseModel<BalanceResponseDto>> getBalanceByUserId(int userId) {
+        BalanceResponseDto balance = balanceRepository.findByUserId(userId, BalanceResponseDto.class);
+        if (balance == null) {
+            throw new NotFoundException("Balance not found");
+        }
+
+        BalanceResponseDto data = new BalanceResponseDto();
+        data.setActive(balance.isActive());
+        data.setBalance(balance.getBalance());
+        ResponseModel<BalanceResponseDto> response = new ResponseModel<>(true, "Balance retrieved successfully", data);
+        return ResponseEntity.ok(response);
+    }
+
+    @Transactional(Transactional.TxType.REQUIRED)
+    public ResponseEntity<ResponseModel<String>> setPin(int userId, String pin) {
+        BalanceModel balance = balanceRepository.findByUserId(userId);
+        if (balance != null) {
+            throw new BadRequestException("Pin already exists");
+        }
+        BalanceModel newBalance = new BalanceModel();
+        newBalance.setUserId(userId);
+        newBalance.setPin(PasswordUtils.hashPassword(pin));
+        newBalance.setBalance(0.0);
+        newBalance.setActive(true);
+        newBalance.setCreatedBy(userId);
+        balanceRepository.save(newBalance);
+        ResponseModel<String> response = new ResponseModel<>(true, "Pin set successfully", null);
+        return ResponseEntity.ok(response);
+    }
+}
