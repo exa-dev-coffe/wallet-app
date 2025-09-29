@@ -9,11 +9,13 @@ public class ScaffoldGenerator {
             return;
         }
 
-        String name = args[0].toLowerCase();
+        String name = args[0];
         String className = Character.toUpperCase(name.charAt(0)) + name.substring(1);
 
         String basePath = "src/main/java/com/time_tracker/be/" + name;
+        String dtoPath = basePath + "/dto";
         new File(basePath).mkdirs();
+        new File(dtoPath).mkdirs();
 
         writeFile(basePath + "/" + className + "Model.java",
                 "package com.time_tracker.be." + name + ";\n\n" +
@@ -29,7 +31,7 @@ public class ScaffoldGenerator {
 
         writeFile(basePath + "/" + className + "Route.java",
                 "package com.time_tracker.be." + name + ";\n\n" +
-                        "public class " + className + "Controller {\n}\n");
+                        "public class " + className + "Route {\n}\n");
 
         System.out.println("✅ Scaffold for module '" + name + "' created!");
     }
