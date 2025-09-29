@@ -1,7 +1,8 @@
 package com.time_tracker.be.balance;
 
 import com.time_tracker.be.annotation.CurrentUser;
-import com.time_tracker.be.balance.dto.BalanceResponseDto;
+import com.time_tracker.be.annotation.RequireAuth;
+import com.time_tracker.be.balance.dto.GetBalanceResponseDto;
 import com.time_tracker.be.balance.dto.SetPinRequestDto;
 import com.time_tracker.be.utils.commons.CurrentUserDto;
 import com.time_tracker.be.utils.commons.ResponseModel;
@@ -19,11 +20,13 @@ public class BalanceRoute {
     }
 
     @GetMapping("/balance")
-    public ResponseEntity<ResponseModel<BalanceResponseDto>> getBalance(@CurrentUser() CurrentUserDto currentUserDto) {
+    @RequireAuth
+    public ResponseEntity<ResponseModel<GetBalanceResponseDto>> getBalance(@CurrentUser() CurrentUserDto currentUserDto) {
         return balanceService.getBalanceByUserId(currentUserDto.getUserId());
     }
 
     @PostMapping("/balance/activate")
+    @RequireAuth
     public ResponseEntity<ResponseModel<String>> setPin(@CurrentUser() CurrentUserDto currentUserDto, @Valid @RequestBody SetPinRequestDto setPinRequest) {
         return balanceService.setPin(currentUserDto.getUserId(), setPinRequest.getPin());
     }

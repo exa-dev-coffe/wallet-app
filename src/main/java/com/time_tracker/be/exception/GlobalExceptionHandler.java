@@ -10,6 +10,7 @@ import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.NoHandlerFoundException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
@@ -130,5 +131,21 @@ public class GlobalExceptionHandler {
         response.setMessage(ex.getMessage());
         response.setData(null);
         return response;
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ResponseModel<Map<String, String>>> handleMethodArgumentTypeMismatchException(MethodArgumentTypeMismatchException ex) {
+        String message = String.format("Invalid value '%s' for parameter '%s'. Expected type is '%s'.",
+                ex.getValue(), ex.getName(), ex.getRequiredType() != null ? ex.getRequiredType().getSimpleName() : "unknown");
+
+        ResponseModel<Map<String, String>> response = new ResponseModel<>();
+        response.setSuccess(false);
+        response.setMessage(message);
+        response.setData(null);
+        response.setTimestamp(java.time.LocalDateTime.now());
+
+        return ResponseEntity
+                .badRequest()
+                .body(response);
     }
 }

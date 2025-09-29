@@ -1,6 +1,7 @@
 package com.time_tracker.be.balance;
 
-import com.time_tracker.be.balance.dto.BalanceResponseDto;
+import com.time_tracker.be.balance.dto.GetBalanceResponseDto;
+import com.time_tracker.be.balance.projection.BalanceProjection;
 import com.time_tracker.be.exception.BadRequestException;
 import com.time_tracker.be.exception.NotFoundException;
 import com.time_tracker.be.utils.PasswordUtils;
@@ -17,16 +18,16 @@ public class BalanceService {
         this.balanceRepository = balanceRepository;
     }
 
-    public ResponseEntity<ResponseModel<BalanceResponseDto>> getBalanceByUserId(int userId) {
-        BalanceResponseDto balance = balanceRepository.findByUserId(userId, BalanceResponseDto.class);
+    public ResponseEntity<ResponseModel<GetBalanceResponseDto>> getBalanceByUserId(int userId) {
+        BalanceProjection balance = balanceRepository.findByUserId(userId, BalanceProjection.class);
         if (balance == null) {
             throw new NotFoundException("Balance not found");
         }
 
-        BalanceResponseDto data = new BalanceResponseDto();
-        data.setActive(balance.isActive());
-        data.setBalance(balance.getBalance());
-        ResponseModel<BalanceResponseDto> response = new ResponseModel<>(true, "Balance retrieved successfully", data);
+        GetBalanceResponseDto responseData = new GetBalanceResponseDto();
+        responseData.setIsActive(balance.getIsActive());
+        responseData.setBalance(balance.getBalance());
+        ResponseModel<GetBalanceResponseDto> response = new ResponseModel<>(true, "Balance retrieved successfully", responseData);
         return ResponseEntity.ok(response);
     }
 

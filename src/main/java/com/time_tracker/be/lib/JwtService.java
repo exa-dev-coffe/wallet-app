@@ -1,6 +1,5 @@
 package com.time_tracker.be.lib;
 
-import com.time_tracker.be.account.AccountModel;
 import com.time_tracker.be.exception.NotAuthorizedException;
 import com.time_tracker.be.utils.enums.TokenType;
 import io.jsonwebtoken.*;
@@ -11,8 +10,6 @@ import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
-import java.util.HashMap;
-import java.util.Map;
 
 @Component
 public class JwtService {
@@ -27,16 +24,6 @@ public class JwtService {
         );
     }
 
-    private Map<String, Object> createClaims(AccountModel user, TokenType type) {
-        Map<String, Object> claims = new HashMap<>();
-        claims.put("fullName", user.getFullName());
-        claims.put("email", user.getEmail());
-        claims.put("userId", user.getUserId());
-        claims.put("type", type.name());
-        claims.put("role", user.getRole().getRoleName());
-        return claims;
-    }
-
     private Date getExpirationDate(TokenType type) {
         long now = System.currentTimeMillis();
         return switch (type) {
@@ -45,17 +32,6 @@ public class JwtService {
             case RESET_PASSWORD -> new Date(now + 1000L * 60 * 5); // 5 menit
             default -> throw new IllegalArgumentException("Unknown token type: " + type);
         };
-    }
-
-    // Membuat token JWT
-    public String createToken(AccountModel user, TokenType type) {
-        return Jwts.builder()
-                .setClaims(createClaims(user, type))
-                .setSubject(user.getEmail())
-                .setIssuedAt(new Date())
-                .setExpiration(getExpirationDate(type))
-                .signWith(getSigningKey(), SignatureAlgorithm.HS512)
-                .compact();
     }
 
     // Ambil claims dari token
