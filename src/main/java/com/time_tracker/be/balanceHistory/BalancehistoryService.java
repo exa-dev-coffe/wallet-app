@@ -93,7 +93,19 @@ public class BalancehistoryService {
             ObjectMapper mapper = new ObjectMapper();
             String jsonMessage = mapper.writeValueAsString(payload);
 
-            rabbitmqService.sendMessage("History Balance Updated", "balance.history", "balance.history.updated", ExchangeType.FANOUT, null, jsonMessage, true, false, false, null);
+            // example fanout
+            rabbitmqService.sendMessage(
+                    "",                         // queueName kosong / abaikan
+                    "",                         // routingKey kosong
+                    "balance.history.updated",  // exchange
+                    ExchangeType.FANOUT,
+                    null,
+                    jsonMessage,
+                    true,
+                    false,  // exclusive = false (biarin consumer yang buat)
+                    false,
+                    null
+            );
         } else {
             throw new BadRequestException("Balance history not found");
         }

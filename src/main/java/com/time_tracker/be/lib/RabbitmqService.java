@@ -42,24 +42,37 @@ public class RabbitmqService {
     // type headers = pesan dikirim ke queue sesuai header yang ditentukan
     // properties = properti pesan, bisa diisi null
     // message = isi pesan
-    public void sendMessage(String queueName, String routingKey, String exchange, ExchangeType exchangeType,
-                            AMQP.BasicProperties properties, String message,
-                            boolean durable, boolean exclusive, boolean autoDelete,
-                            Map<String, Object> headers) throws Exception {
+    public void sendMessage(
+            String queueName,
+            String routingKey,
+            String exchange,
+            ExchangeType exchangeType,
+            AMQP.BasicProperties properties,
+            String message,
+            boolean durable,
+            boolean exclusive,
+            boolean autoDelete,
+            Map<String, Object> headers
+    ) throws Exception {
 
+        // Declare exchange (aman kalau dipanggil berkali2)
         channel.exchangeDeclare(exchange, exchangeType.getValue(), durable);
-        channel.queueDeclare(queueName, durable, exclusive, autoDelete, headers);
 
         switch (exchangeType) {
             case FANOUT:
-                channel.queueBind(queueName, exchange, "");
+                // FANOUT: kirim ke semua queue yg sudah bind, producer ga perlu declare queue
                 channel.basicPublish(exchange, "", properties, message.getBytes());
                 break;
+
             case HEADERS:
-                channel.queueBind(queueName, exchange, "", headers);
+                // HEADERS: sama, producer hanya publish
                 channel.basicPublish(exchange, "", properties, message.getBytes());
                 break;
-            default: // DIRECT, TOPIC
+
+            case DIRECT:
+            case TOPIC:
+                // DIRECT/TOPIC: kalau memang 1 queue fixed, producer bisa declare
+                channel.queueDeclare(queueName, durable, exclusive, autoDelete, headers);
                 channel.queueBind(queueName, exchange, routingKey);
                 channel.basicPublish(exchange, routingKey, properties, message.getBytes());
                 break;
@@ -67,7 +80,6 @@ public class RabbitmqService {
 
         log.info(" [x] Sent '{}' to exchange '{}' with queue '{}' (routingKey='{}')",
                 message, exchange, queueName, routingKey);
-
     }
 
     @PreDestroy
