@@ -1,4 +1,4 @@
-name: Build & Deploy Account Service to VPS via GHCR
+name: Build & Deploy Wallet Service to VPS via GHCR
 
 on:
   push:
@@ -17,10 +17,10 @@ jobs:
 
       - name: Build Docker image
         run: |
-          docker build -t ghcr.io/${{ github.repository_owner }}/account-service-coffe:latest .
+          docker build -t ghcr.io/${{ github.repository_owner }}/wallet-service-coffe:latest .
 
       - name: Push Docker image to GHCR
-        run: docker push ghcr.io/${{ github.repository_owner }}/account-service-coffe:latest
+        run: docker push ghcr.io/${{ github.repository_owner }}/wallet-service-coffe:latest
 
       - name: Deploy to VPS
         run: |
@@ -31,8 +31,8 @@ jobs:
           
           ssh -p 31086 -i ~/.ssh/id_ed25519 deploy@${{ secrets.VPS_HOST }} << 'EOF'
             docker login ghcr.io -u ${{ github.repository_owner }} -p '${{ secrets.GHCR_TOKEN }}'
-            docker pull ghcr.io/${{ github.repository_owner }}/account-service-coffe:latest
-            docker stop account-service-coffe || true && docker rm account-service-coffe || true 
+            docker pull ghcr.io/${{ github.repository_owner }}/wallet-service-coffe:latest
+            docker stop wallet-service-coffe || true && docker rm wallet-service-coffe || true 
           
-            docker run --env-file /home/deploy/env_project/coffe/account_service/.env -d --name account-service-coffe --network coffe-net -p 8000:8080 --memory="512m" --cpus="1.0" --restart=on-failure:5 ghcr.io/${{ github.repository_owner }}/account-service-coffe:latest
+            docker run --env-file /home/deploy/env_project/coffe/wallet_service/.env -d --name wallet-service-coffe --network coffe-net -p 8002:8082 --memory="512m" --cpus="1.0" --restart=on-failure:5 ghcr.io/${{ github.repository_owner }}/wallet-service-coffe:latest
           EOF
