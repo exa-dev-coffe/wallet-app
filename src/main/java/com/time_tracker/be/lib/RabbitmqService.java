@@ -4,12 +4,15 @@ import com.rabbitmq.client.AMQP;
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Connection;
 import com.rabbitmq.client.ConnectionFactory;
+import com.time_tracker.be.utils.enums.ExchangeType;
 import jakarta.annotation.PreDestroy;
-import org.springframework.context.annotation.Configuration;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Component;
 
 import java.util.Map;
 
-@Configuration
+@Component
+@Slf4j
 public class RabbitmqService {
 
     private final ConnectionFactory factory;
@@ -30,14 +33,41 @@ public class RabbitmqService {
     // exclusive = apakah hanya 1 client yang bisa mengakses queue ini
     // autoDelete = apakah queue dihapus saat tidak ada client yang mengakses
     // headers = properti tambahan dalam bentuk key-value
-    // ruting key = nama queue
+    // routing key = nama queue tujuan (pada exchange type direct dan topic, routing key harus sesuai dengan nama queue tujuan, pada exchange type fanout dan headers, routing key bisa diisi sembarang)
     // exchange = tempat pengiriman pesan, bisa diisi "" untuk default exchange (Direct) kalo default exchange, routing key harus sama dengan nama queue tujuannya, kalo bukan default exchange, routing key bisa diisi sesuai kebutuhan (Direct, Fanout, Topic, Headers)
+    // exchangeType = tipe exchange, bisa diisi "direct", "fanout", "topic", "headers"
+    // type direct = pesan dikirim ke queue sesuai routing key
+    // type fanout = pesan dikirim ke semua queue yang terhubung ke exchange ini
+    // type topic = pesan dikirim ke queue sesuai pola routing key (misal: "user.*" akan mengirim pesan ke queue dengan routing key "user.create", "user.delete", dll)
+    // type headers = pesan dikirim ke queue sesuai header yang ditentukan
     // properties = properti pesan, bisa diisi null
     // message = isi pesan
-    public void sendMessage(String routingKey, String exchange, AMQP.BasicProperties properties, String message, Boolean durable, boolean exclusive, boolean autoDelete, Map<String, Object> headers) throws Exception {
-        channel.queueDeclare(routingKey, durable, exclusive, autoDelete, headers);
-        channel.basicPublish(exchange, routingKey, properties, message.getBytes());
-        System.out.println(" [x] Sent '" + message + "' to queue: " + routingKey);
+    public void sendMessage(String queueName, String routingKey, String exchange, ExchangeType exchangeType,
+                            AMQP.BasicProperties properties, String message,
+                            boolean durable, boolean exclusive, boolean autoDelete,
+                            Map<String, Object> headers) throws Exception {
+
+        channel.exchangeDeclare(exchange, exchangeType.getValue(), durable);
+        channel.queueDeclare(queueName, durable, exclusive, autoDelete, headers);
+
+        switch (exchangeType) {
+            case FANOUT:
+                channel.queueBind(queueName, exchange, "");
+                channel.basicPublish(exchange, "", properties, message.getBytes());
+                break;
+            case HEADERS:
+                channel.queueBind(queueName, exchange, "", headers);
+                channel.basicPublish(exchange, "", properties, message.getBytes());
+                break;
+            default: // DIRECT, TOPIC
+                channel.queueBind(queueName, exchange, routingKey);
+                channel.basicPublish(exchange, routingKey, properties, message.getBytes());
+                break;
+        }
+
+        log.info(" [x] Sent '{}' to exchange '{}' with queue '{}' (routingKey='{}')",
+                message, exchange, queueName, routingKey);
+
     }
 
     @PreDestroy

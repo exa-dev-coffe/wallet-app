@@ -1,9 +1,18 @@
 package com.time_tracker.be.balanceHistory;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.time_tracker.be.balance.BalanceModel;
+import com.time_tracker.be.balanceHistory.dto.BalanceHistoryPayloadDto;
 import com.time_tracker.be.balanceHistory.dto.BalanceHistoryResponseDto;
+import com.time_tracker.be.balanceHistory.enums.StatusBalanceHistory;
+import com.time_tracker.be.balanceHistory.enums.TypeBalanceHistory;
+import com.time_tracker.be.exception.BadRequestException;
+import com.time_tracker.be.lib.MidtransService;
+import com.time_tracker.be.lib.RabbitmqService;
 import com.time_tracker.be.utils.commons.GenericSpecification;
 import com.time_tracker.be.utils.commons.PaginationResponseDto;
 import com.time_tracker.be.utils.commons.ResponseModel;
+import com.time_tracker.be.utils.enums.ExchangeType;
 import jakarta.persistence.criteria.Predicate;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -15,9 +24,14 @@ import org.springframework.stereotype.Service;
 public class BalancehistoryService {
 
     private final BalancehistoryRepository balancehistoryRepository;
+    private final RabbitmqService rabbitmqService;
+    private final MidtransService midtransService;
 
-    public BalancehistoryService(BalancehistoryRepository balancehistoryRepository) {
+
+    public BalancehistoryService(BalancehistoryRepository balancehistoryRepository, RabbitmqService rabbitmqService, MidtransService midtransService) {
         this.balancehistoryRepository = balancehistoryRepository;
+        this.midtransService = midtransService;
+        this.rabbitmqService = rabbitmqService;
     }
 
     public ResponseEntity<ResponseModel<PaginationResponseDto<BalanceHistoryResponseDto>>> getAllBalanceHistory(
@@ -28,7 +42,7 @@ public class BalancehistoryService {
         Specification<BalancehistoryModel> spec = Specification.where(
                 (root, query, criteriaBuilder) -> {
                     Predicate dynamicPredicate = GenericSpecification.<BalancehistoryModel>dynamicFilter(
-                            searchValue, searchKey
+                            searchKey, searchValue
                     ).toPredicate(root, query, criteriaBuilder);
 
                     return criteriaBuilder.and(dynamicPredicate);
@@ -44,5 +58,53 @@ public class BalancehistoryService {
         return ResponseEntity.ok(response);
     }
 
+    public Integer createBalanceHistory(BalanceModel balance, TypeBalanceHistory typeBalanceHistory, Double amount, String token, String redirectUrl) {
+        BalancehistoryModel balancehistoryModel = new BalancehistoryModel();
+        balancehistoryModel.setBalance(balance);
+        balancehistoryModel.setType(typeBalanceHistory);
+        balancehistoryModel.setAmount(amount);
+        balancehistoryModel.setStatus(StatusBalanceHistory.PENDING);
+        balancehistoryModel.setToken(token);
+        balancehistoryModel.setRedirectUrl(redirectUrl);
+        balancehistoryModel.setCreatedBy(balance.getUserId());
+        balancehistoryRepository.save(balancehistoryModel);
+        return balancehistoryModel.getId();
+    }
+
+    public void updateMidtransTokenAndRedirectUrl(Integer id, String token, String redirectUrl) {
+        BalancehistoryModel balancehistoryModel = balancehistoryRepository.findById(id).orElse(null);
+        if (balancehistoryModel != null) {
+            balancehistoryModel.setToken(token);
+            balancehistoryModel.setRedirectUrl(redirectUrl);
+            balancehistoryRepository.save(balancehistoryModel);
+        }
+    }
+
+    public void updateBalanceHistoryStatus(Integer id, StatusBalanceHistory statusBalanceHistory) throws Exception {
+        BalancehistoryModel balancehistoryModel = balancehistoryRepository.findById(id).orElse(null);
+        if (balancehistoryModel != null) {
+            balancehistoryModel.setStatus(statusBalanceHistory);
+            balancehistoryRepository.save(balancehistoryModel);
+            BalanceHistoryPayloadDto payload = new BalanceHistoryPayloadDto();
+            payload.setType("update_balance_history");
+            payload.setStatus(statusBalanceHistory.name());
+            payload.setBalanceHistoryId(balancehistoryModel.getBalance().getId());
+
+            ObjectMapper mapper = new ObjectMapper();
+            String jsonMessage = mapper.writeValueAsString(payload);
+
+            rabbitmqService.sendMessage("History Balance Updated", "balance.history", "balance.history.updated", ExchangeType.FANOUT, null, jsonMessage, true, false, false, null);
+        } else {
+            throw new BadRequestException("Balance history not found");
+        }
+    }
+
+    public BalancehistoryModel getBalanceHistoryById(Integer id) {
+        BalancehistoryModel balancehistoryModel = balancehistoryRepository.findById(id).orElse(null);
+        if (balancehistoryModel == null) {
+            throw new BadRequestException("Balance history not found");
+        }
+        return balancehistoryModel;
+    }
 
 }
