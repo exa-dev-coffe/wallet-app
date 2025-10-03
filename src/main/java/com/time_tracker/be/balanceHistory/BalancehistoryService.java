@@ -102,7 +102,7 @@ public class BalancehistoryService {
                     ExchangeType.FANOUT,
                     null,
                     jsonMessage,
-                    true,
+                    false,
                     false,  // exclusive = false (biarin consumer yang buat)
                     false,
                     null
