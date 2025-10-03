@@ -9,4 +9,5 @@ import lombok.EqualsAndHashCode;
 public class BalanceHistoryPayloadDto extends BasePayloadSse {
     private String status;
     private Integer balanceHistoryId;
+    private Integer userId;
 }

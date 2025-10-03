@@ -106,14 +106,14 @@ public class BalanceService {
         }
 
         if (statusBalanceHistory != StatusBalanceHistory.COMPLETED) {
-            balancehistoryService.updateBalanceHistoryStatus(Integer.valueOf(id), statusBalanceHistory);
+            balancehistoryService.updateBalanceHistoryStatus(Integer.valueOf(id), statusBalanceHistory, balance.getUserId());
             return ResponseEntity.ok(new ResponseModel<>(true, "Notification processed", null));
         }
         balance.setBalance(balance.getBalance() + balancehistoryModel.getAmount());
         balanceRepository.save(balance);
 
-        balancehistoryService.updateBalanceHistoryStatus(Integer.valueOf(id), statusBalanceHistory);
-        
+        balancehistoryService.updateBalanceHistoryStatus(Integer.valueOf(id), statusBalanceHistory, balance.getUserId());
+
         return ResponseEntity.ok(new ResponseModel<>(true, "Notification processed", null));
     }
 

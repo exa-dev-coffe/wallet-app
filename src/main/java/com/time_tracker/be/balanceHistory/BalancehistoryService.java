@@ -80,7 +80,7 @@ public class BalancehistoryService {
         }
     }
 
-    public void updateBalanceHistoryStatus(Integer id, StatusBalanceHistory statusBalanceHistory) throws Exception {
+    public void updateBalanceHistoryStatus(Integer id, StatusBalanceHistory statusBalanceHistory, Integer userId) throws Exception {
         BalancehistoryModel balancehistoryModel = balancehistoryRepository.findById(id).orElse(null);
         if (balancehistoryModel != null) {
             balancehistoryModel.setStatus(statusBalanceHistory);
@@ -89,6 +89,7 @@ public class BalancehistoryService {
             payload.setType("update_balance_history");
             payload.setStatus(statusBalanceHistory.name());
             payload.setBalanceHistoryId(balancehistoryModel.getBalance().getId());
+            payload.setUserId(userId);
 
             ObjectMapper mapper = new ObjectMapper();
             String jsonMessage = mapper.writeValueAsString(payload);
