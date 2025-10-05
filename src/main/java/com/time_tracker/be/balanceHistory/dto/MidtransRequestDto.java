@@ -3,6 +3,8 @@ package com.time_tracker.be.balanceHistory.dto;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 
+import java.util.UUID;
+
 @Data
 public class MidtransRequestDto {
     @JsonProperty("fraud_status")
@@ -10,7 +12,7 @@ public class MidtransRequestDto {
     @JsonProperty("transaction_status")
     private String transactionStatus;
     @JsonProperty("order_id")
-    private String orderId;
+    private UUID orderId;
     @JsonProperty("gross_amount")
     private String grossAmount;
     @JsonProperty("payment_type")

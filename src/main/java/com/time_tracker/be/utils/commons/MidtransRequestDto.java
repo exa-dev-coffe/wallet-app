@@ -5,6 +5,7 @@ import lombok.Data;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 
 @Data
 public class MidtransRequestDto {
@@ -15,7 +16,7 @@ public class MidtransRequestDto {
     @JsonProperty("customer_details")
     private CustomerDetails customerDetails;
 
-    public MidtransRequestDto(Integer orderId, Double grossAmount, String firstName, String email) {
+    public MidtransRequestDto(UUID orderId, Double grossAmount, String firstName, String email) {
         this.transactionDetails = new TransactionDetails(orderId, grossAmount);
         this.customerDetails = new CustomerDetails(firstName, email);
     }
@@ -23,11 +24,11 @@ public class MidtransRequestDto {
     @Data
     public static class TransactionDetails {
         @JsonProperty("order_id")
-        private Integer orderId;
+        private UUID orderId;
         @JsonProperty("gross_amount")
         private Double grossAmount;
 
-        public TransactionDetails(Integer orderId, Double grossAmount) {
+        public TransactionDetails(UUID orderId, Double grossAmount) {
             this.orderId = orderId;
             this.grossAmount = grossAmount;
         }

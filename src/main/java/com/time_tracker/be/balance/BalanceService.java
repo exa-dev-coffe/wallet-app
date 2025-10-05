@@ -19,6 +19,8 @@ import jakarta.transaction.Transactional;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
+import java.util.UUID;
+
 @Service
 public class BalanceService {
     private final BalanceRepository balanceRepository;
@@ -64,16 +66,13 @@ public class BalanceService {
     }
 
     @Transactional(Transactional.TxType.REQUIRED)
-    public ResponseEntity<ResponseModel<TopUpResponseDto>> topUp(int userId, double amount, String pin, String email, String fullName) throws Exception {
+    public ResponseEntity<ResponseModel<TopUpResponseDto>> topUp(int userId, double amount, String email, String fullName) throws Exception {
         BalanceModel balance = balanceRepository.findByUserId(userId);
         if (balance == null) {
             throw new NotFoundException("Balance not found");
         }
-        if (!PasswordUtils.matches(pin, balance.getPin())) {
-            throw new BadRequestException("Invalid pin");
-        }
 
-        Integer balanceHistoryId = balancehistoryService.createBalanceHistory(balance, TypeBalanceHistory.TOPUP, amount, null, null);
+        UUID balanceHistoryId = balancehistoryService.createBalanceHistory(balance, TypeBalanceHistory.TOPUP, amount, null, null);
 
         MidtransRequestDto midtransRequestDto = new MidtransRequestDto(balanceHistoryId, amount, fullName, email);
 
@@ -88,7 +87,7 @@ public class BalanceService {
     }
 
     @Transactional(Transactional.TxType.REQUIRED)
-    public ResponseEntity<ResponseModel<String>> notificationMidtransHandler(String id, StatusBalanceHistory statusBalanceHistory, String statusCode, String grossAmount, String signatureKey) throws Exception {
+    public ResponseEntity<ResponseModel<String>> notificationMidtransHandler(UUID id, StatusBalanceHistory statusBalanceHistory, String statusCode, String grossAmount, String signatureKey) throws Exception {
         boolean isValidSignature = midtransService.validateSignatureKey(
                 id, statusCode, grossAmount, signatureKey
 
@@ -97,7 +96,7 @@ public class BalanceService {
             throw new BadRequestException("Invalid signature key");
         }
 
-        BalancehistoryModel balancehistoryModel = balancehistoryService.getBalanceHistoryById(Integer.valueOf(id));
+        BalancehistoryModel balancehistoryModel = balancehistoryService.getBalanceHistoryById(id);
 
         BalanceModel balance = balanceRepository.findById(balancehistoryModel.getBalance().getId()).orElse(null);
 
@@ -106,13 +105,13 @@ public class BalanceService {
         }
 
         if (statusBalanceHistory != StatusBalanceHistory.COMPLETED) {
-            balancehistoryService.updateBalanceHistoryStatus(Integer.valueOf(id), statusBalanceHistory, balance.getUserId());
+            balancehistoryService.updateBalanceHistoryStatus(id, statusBalanceHistory, balance.getUserId());
             return ResponseEntity.ok(new ResponseModel<>(true, "Notification processed", null));
         }
         balance.setBalance(balance.getBalance() + balancehistoryModel.getAmount());
         balanceRepository.save(balance);
 
-        balancehistoryService.updateBalanceHistoryStatus(Integer.valueOf(id), statusBalanceHistory, balance.getUserId());
+        balancehistoryService.updateBalanceHistoryStatus(id, statusBalanceHistory, balance.getUserId());
 
         return ResponseEntity.ok(new ResponseModel<>(true, "Notification processed", null));
     }

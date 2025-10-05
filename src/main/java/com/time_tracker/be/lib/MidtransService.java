@@ -9,6 +9,8 @@ import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import java.util.UUID;
+
 @Slf4j
 @Component
 public class MidtransService {
@@ -34,12 +36,12 @@ public class MidtransService {
         );
     }
 
-    public boolean validateSignatureKey(String orderId, String statusCode, String grossAmount, String signatureKey) {
+    public boolean validateSignatureKey(UUID orderId, String statusCode, String grossAmount, String signatureKey) {
         String input = orderId + statusCode + grossAmount + serverKey;
         String generatedSignatureKey = org.apache.commons.codec.digest.DigestUtils.sha512Hex(input);
         return generatedSignatureKey.equals(signatureKey);
     }
-
+    
     public StatusBalanceHistory mapTransactionStatus(String transactionStatus, String fraudStatus) {
         if ("capture".equals(transactionStatus)) {
             if ("challenge".equals(fraudStatus)) {

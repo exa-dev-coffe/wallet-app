@@ -41,7 +41,7 @@ public class BalanceRoute {
     @PostMapping("/balance/top-up")
     @RequireAuth
     public ResponseEntity<ResponseModel<TopUpResponseDto>> topUpBalance(@CurrentUser() CurrentUserDto currentUserDto, @Valid @RequestBody TopUpRequestDto topUpRequestDto) throws Exception {
-        return balanceService.topUp(currentUserDto.getUserId(), topUpRequestDto.getAmount(), topUpRequestDto.getPin(), currentUserDto.getEmail(), currentUserDto.getFullName());
+        return balanceService.topUp(currentUserDto.getUserId(), topUpRequestDto.getAmount(), currentUserDto.getEmail(), currentUserDto.getFullName());
     }
 
     @PostMapping("/midtrans-notification")
