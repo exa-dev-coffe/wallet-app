@@ -13,6 +13,9 @@ public class GenericSpecification {
 
     public static <T> Specification<T> dynamicFilter(String key, String value) {
         return (root, query, cb) -> {
+            if (key == null || value == null || key.trim().isEmpty() || value.trim().isEmpty()) {
+                return cb.conjunction(); // selalu true
+            }
             String[] keys = key.split(",");
             String[] values = value.split(",");
 
