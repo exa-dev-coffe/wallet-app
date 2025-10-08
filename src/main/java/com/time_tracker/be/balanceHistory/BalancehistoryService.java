@@ -19,6 +19,7 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
+import java.util.Date;
 import java.util.UUID;
 
 @Service
@@ -66,6 +67,7 @@ public class BalancehistoryService {
         balancehistoryModel.setToken(token);
         balancehistoryModel.setRedirectUrl(redirectUrl);
         balancehistoryModel.setCreatedBy(balance.getUserId());
+        balancehistoryModel.setUpdatedBy(balance.getUserId());
         balancehistoryRepository.save(balancehistoryModel);
         return balancehistoryModel.getId();
     }
@@ -75,6 +77,7 @@ public class BalancehistoryService {
         if (balancehistoryModel != null) {
             balancehistoryModel.setToken(token);
             balancehistoryModel.setRedirectUrl(redirectUrl);
+            balancehistoryModel.setUpdatedAt(new Date());
             balancehistoryRepository.save(balancehistoryModel);
         }
     }
@@ -83,6 +86,8 @@ public class BalancehistoryService {
         BalancehistoryModel balancehistoryModel = balancehistoryRepository.findById(id).orElse(null);
         if (balancehistoryModel != null) {
             balancehistoryModel.setStatus(statusBalanceHistory);
+            balancehistoryModel.setUpdatedAt(new Date());
+            balancehistoryModel.setUpdatedBy(userId);
             balancehistoryRepository.save(balancehistoryModel);
             BalanceHistoryPayloadDto payload = new BalanceHistoryPayloadDto();
             payload.setType("update_balance_history");
