@@ -6,6 +6,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.InvalidDataAccessApiUsageException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -137,6 +138,21 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ResponseModel<Map<String, String>>> handleMethodArgumentTypeMismatchException(MethodArgumentTypeMismatchException ex) {
         String message = String.format("Invalid value '%s' for parameter '%s'. Expected type is '%s'.",
                 ex.getValue(), ex.getName(), ex.getRequiredType() != null ? ex.getRequiredType().getSimpleName() : "unknown");
+
+        ResponseModel<Map<String, String>> response = new ResponseModel<>();
+        response.setSuccess(false);
+        response.setMessage(message);
+        response.setData(null);
+        response.setTimestamp(java.time.LocalDateTime.now());
+
+        return ResponseEntity
+                .badRequest()
+                .body(response);
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ResponseModel<Map<String, String>>> handleHttpMessageNotReadableException(HttpMessageNotReadableException ex) {
+        String message = "Malformed JSON request";
 
         ResponseModel<Map<String, String>> response = new ResponseModel<>();
         response.setSuccess(false);
