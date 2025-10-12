@@ -116,4 +116,22 @@ public class BalanceService {
         return ResponseEntity.ok(new ResponseModel<>(true, "Notification processed", null));
     }
 
+    public boolean pay(int userId, double amount, String pin) {
+        BalanceModel balance = balanceRepository.findByUserId(userId);
+        if (balance == null) {
+            throw new NotFoundException("Balance not found");
+        }
+        if (!PasswordUtils.matches(pin, balance.getPin())) {
+            throw new BadRequestException("Invalid pin");
+        }
+        if (balance.getBalance() < amount) {
+            return false;
+        } else {
+            balance.setBalance(balance.getBalance() - amount);
+            balanceRepository.save(balance);
+            balancehistoryService.createBalanceHistory(balance, TypeBalanceHistory.PAYMENT, amount, null, null);
+            return true;
+        }
+    }
+
 }
