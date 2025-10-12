@@ -9,6 +9,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
@@ -153,6 +154,21 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ResponseModel<Map<String, String>>> handleHttpMessageNotReadableException(HttpMessageNotReadableException ex) {
         String message = "Malformed JSON request";
+
+        ResponseModel<Map<String, String>> response = new ResponseModel<>();
+        response.setSuccess(false);
+        response.setMessage(message);
+        response.setData(null);
+        response.setTimestamp(java.time.LocalDateTime.now());
+
+        return ResponseEntity
+                .badRequest()
+                .body(response);
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ResponseModel<Map<String, String>>> handleMissingServletRequestParameterException(MissingServletRequestParameterException ex) {
+        String message = String.format("Missing required parameter: '%s'", ex.getParameterName());
 
         ResponseModel<Map<String, String>> response = new ResponseModel<>();
         response.setSuccess(false);
