@@ -105,7 +105,7 @@ public class BalancehistoryService {
             // example fanout
             rabbitmqService.sendMessage(
                     "",                         // queueName kosong / abaikan
-                    "",                         // routingKey kosong
+                    String.valueOf(userId),
                     "balance.history.updated",  // exchange
                     ExchangeType.FANOUT,
                     null,
