@@ -108,7 +108,7 @@ public class BalancehistoryService {
                     jsonMessage,
                     false,
                     false,  // exclusive = false (biarin consumer yang buat)
-                    false,
+                    true,
                     null
             );
         } else {
