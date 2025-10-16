@@ -85,7 +85,10 @@ public class BalancehistoryService {
 
     public void updateBalanceHistoryStatus(UUID id, StatusBalanceHistory statusBalanceHistory, Integer userId) throws Exception {
         BalancehistoryModel balancehistoryModel = balancehistoryRepository.findById(id).orElse(null);
-        if (balancehistoryModel != null && balancehistoryModel.getStatus() != StatusBalanceHistory.PENDING) {
+        if (balancehistoryModel == null) {
+            throw new BadRequestException("Balance history not found");
+        }
+        if (balancehistoryModel.getStatus() == StatusBalanceHistory.PENDING) {
             balancehistoryModel.setStatus(statusBalanceHistory);
             balancehistoryModel.setUpdatedAt(new Date());
             balancehistoryModel.setUpdatedBy(userId);
@@ -113,7 +116,7 @@ public class BalancehistoryService {
                     null
             );
         } else {
-            throw new BadRequestException("Balance history not found");
+            throw new BadRequestException("Balance history already processed");
         }
     }
 
