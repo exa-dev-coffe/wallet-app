@@ -103,16 +103,13 @@ public class BalancehistoryService {
             String jsonMessage = mapper.writeValueAsString(payload);
 
             // example fanout
-            rabbitmqService.sendMessage(
-                    "",                         // queueName kosong / abaikan
-                    String.valueOf(userId),
+            rabbitmqService.sendToExchange(
                     "balance.history.updated",  // exchange
-                    ExchangeType.FANOUT,
-                    null,
+                    ExchangeType.DIRECT,
+                    String.valueOf(userId),
                     jsonMessage,
                     false,
                     false,  // exclusive = false (biarin consumer yang buat)
-                    true,
                     null
             );
         } else {

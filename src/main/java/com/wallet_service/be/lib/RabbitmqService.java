@@ -78,6 +78,21 @@ public class RabbitmqService {
                 message, exchange, exchangeType.getValue(), queueName, routingKey);
     }
 
+    public void sendToExchange(
+            String exchange,
+            ExchangeType exchangeType,
+            String routingKey,
+            String message,
+            boolean durable,
+            boolean autoDelete,
+            AMQP.BasicProperties properties
+    ) throws Exception {
+        channel.exchangeDeclare(exchange, exchangeType.getValue(), durable, autoDelete, false, null);
+        channel.basicPublish(exchange, routingKey, properties, message.getBytes());
+        log.info("Published to exchange '{}' with routingKey='{}': {}", exchange, routingKey, message);
+    }
+
+
     @PreDestroy
     public void close() throws Exception {
         if (channel != null) channel.close();
