@@ -72,7 +72,7 @@ public class BalanceService {
             throw new NotFoundException("Balance not found");
         }
 
-        UUID balanceHistoryId = balancehistoryService.createBalanceHistory(balance, TypeBalanceHistory.TOPUP, amount, null, null);
+        UUID balanceHistoryId = balancehistoryService.createBalanceHistory(balance, TypeBalanceHistory.TOPUP, amount, null, null, StatusBalanceHistory.PENDING);
 
         MidtransRequestDto midtransRequestDto = new MidtransRequestDto(balanceHistoryId, amount, fullName, email);
 
@@ -129,7 +129,7 @@ public class BalanceService {
         } else {
             balance.setBalance(balance.getBalance() - amount);
             balanceRepository.save(balance);
-            balancehistoryService.createBalanceHistory(balance, TypeBalanceHistory.PAYMENT, amount, null, null);
+            balancehistoryService.createBalanceHistory(balance, TypeBalanceHistory.PAYMENT, amount, null, null, StatusBalanceHistory.COMPLETED);
             return true;
         }
     }
