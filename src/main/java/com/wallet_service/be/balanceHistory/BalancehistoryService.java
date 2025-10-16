@@ -58,12 +58,13 @@ public class BalancehistoryService {
         return ResponseEntity.ok(response);
     }
 
-    public UUID createBalanceHistory(BalanceModel balance, TypeBalanceHistory typeBalanceHistory, Double amount, String token, String redirectUrl) {
+    public UUID createBalanceHistory(BalanceModel balance, TypeBalanceHistory typeBalanceHistory, Double amount, String token, String redirectUrl, StatusBalanceHistory
+            statusBalanceHistory) {
         BalancehistoryModel balancehistoryModel = new BalancehistoryModel();
         balancehistoryModel.setBalance(balance);
         balancehistoryModel.setType(typeBalanceHistory);
         balancehistoryModel.setAmount(amount);
-        balancehistoryModel.setStatus(StatusBalanceHistory.PENDING);
+        balancehistoryModel.setStatus(statusBalanceHistory);
         balancehistoryModel.setToken(token);
         balancehistoryModel.setRedirectUrl(redirectUrl);
         balancehistoryModel.setCreatedBy(balance.getUserId());
@@ -84,7 +85,7 @@ public class BalancehistoryService {
 
     public void updateBalanceHistoryStatus(UUID id, StatusBalanceHistory statusBalanceHistory, Integer userId) throws Exception {
         BalancehistoryModel balancehistoryModel = balancehistoryRepository.findById(id).orElse(null);
-        if (balancehistoryModel != null) {
+        if (balancehistoryModel != null && balancehistoryModel.getStatus() != StatusBalanceHistory.PENDING) {
             balancehistoryModel.setStatus(statusBalanceHistory);
             balancehistoryModel.setUpdatedAt(new Date());
             balancehistoryModel.setUpdatedBy(userId);
