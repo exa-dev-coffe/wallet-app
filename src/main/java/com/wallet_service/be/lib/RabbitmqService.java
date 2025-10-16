@@ -54,30 +54,28 @@ public class RabbitmqService {
             boolean autoDelete,
             Map<String, Object> headers
     ) throws Exception {
-
-        // Declare exchange (aman kalau dipanggil berkali2)
-        channel.exchangeDeclare(exchange, exchangeType.getValue(), durable);
+        // 🔹 Declare exchange lengkap
+        // Argumen: name, type, durable, autoDelete, internal, arguments
+        channel.exchangeDeclare(exchange, exchangeType.getValue(), durable, autoDelete, false, headers);
 
         switch (exchangeType) {
             case FANOUT:
             case HEADERS:
-                // FANOUT: kirim ke semua queue yg sudah bind, producer ga perlu declare queue
-                // HEADERS: sama, producer hanya publish
+                // FANOUT/HEADERS: tidak perlu queue dari sisi producer
                 channel.basicPublish(exchange, "", properties, message.getBytes());
                 break;
 
-
             case DIRECT:
             case TOPIC:
-                // DIRECT/TOPIC: kalau memang 1 queue fixed, producer bisa declare
+                // DIRECT/TOPIC: deklarasi queue dan bind ke exchange
                 channel.queueDeclare(queueName, durable, exclusive, autoDelete, headers);
                 channel.queueBind(queueName, exchange, routingKey);
                 channel.basicPublish(exchange, routingKey, properties, message.getBytes());
                 break;
         }
 
-        log.info(" [x] Sent '{}' to exchange '{}' with queue '{}' (routingKey='{}')",
-                message, exchange, queueName, routingKey);
+        log.info(" [x] Sent '{}' to exchange '{}' (type='{}', queue='{}', routingKey='{}')",
+                message, exchange, exchangeType.getValue(), queueName, routingKey);
     }
 
     @PreDestroy
