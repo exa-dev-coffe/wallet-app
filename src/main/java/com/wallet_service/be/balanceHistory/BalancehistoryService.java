@@ -109,7 +109,7 @@ public class BalancehistoryService {
                     String.valueOf(userId),
                     jsonMessage,
                     false,
-                    false,  // exclusive = false (biarin consumer yang buat)
+                    true,
                     null
             );
         } else {
