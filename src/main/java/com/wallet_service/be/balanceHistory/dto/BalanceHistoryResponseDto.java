@@ -15,8 +15,8 @@ public class BalanceHistoryResponseDto {
     private UUID id;
     private String status;
     private String token;
-    private String redirect_url;
-    private Date created_at;
+    private String redirectUrl;
+    private Date createdAt;
 
     // Static method mapper
     public static BalanceHistoryResponseDto fromEntity(BalancehistoryModel entity) {
@@ -26,8 +26,8 @@ public class BalanceHistoryResponseDto {
                 .id(entity.getId())
                 .status(entity.getStatus().getValue())
                 .token(entity.getToken())
-                .redirect_url(entity.getRedirectUrl())
-                .created_at(entity.getCreatedAt())
+                .redirectUrl(entity.getRedirectUrl())
+                .createdAt(entity.getCreatedAt())
                 .build();
     }
 }
