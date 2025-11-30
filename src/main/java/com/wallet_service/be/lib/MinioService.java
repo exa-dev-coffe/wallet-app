@@ -18,12 +18,13 @@ public class MinioService {
 
     public MinioService(
             @Value("${minio.url}") String url,
+            @Value("${minio.endpoint}") String endpoint,
             @Value("${minio.accessKey}") String accessKey,
             @Value("${minio.secretKey}") String secretKey,
             @Value("${minio.bucketName}") String bucketName
     ) {
         this.minioClient = MinioClient.builder()
-                .endpoint(url)
+                .endpoint(endpoint)
                 .credentials(accessKey, secretKey)
                 .build();
         this.bucketName = bucketName;
