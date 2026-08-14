@@ -16,6 +16,8 @@ public class MidtransConfig {
     private String clientKey;
     @Value("${midtrans.is-production}")
     private boolean isProduction;
+    @Value("${midtrans.override-notification}")
+    private String overrideNotification;
 
 
     @Bean
@@ -24,6 +26,7 @@ public class MidtransConfig {
                 .setServerKey(serverKey)
                 .setClientKey(clientKey)
                 .setIsProduction(isProduction)
+                .setPaymentOverrideNotification(overrideNotification)
                 .build();
         return new ConfigFactory(config).getSnapApi();
     }

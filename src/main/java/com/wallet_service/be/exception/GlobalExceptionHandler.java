@@ -19,8 +19,13 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     @ExceptionHandler(NotFoundException.class)
     public ResponseEntity<ResponseModel<Map<String, Object>>> handleNotFoundException(NotFoundException ex) {
@@ -111,7 +116,7 @@ public class GlobalExceptionHandler {
         body.setMessage("Internal server error");
         body.setData(null);
         body.setTimestamp(java.time.LocalDateTime.now());
-        ex.printStackTrace(); // Log the exception for debugging
+        log.error("An unexpected error occurred", ex); // Log the exception for debugging
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(body);
     }
 
