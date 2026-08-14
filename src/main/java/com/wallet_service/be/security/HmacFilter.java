@@ -46,6 +46,8 @@ public class HmacFilter {
         String query = req.getQueryString() == null ? "" : req.getQueryString();
         String message = query + timestamp + body;
 
+        log.info("HMAC Validation Data - Payload: [{}], Body: [{}]", message, body);
+
         if (!this.hmacUtils.verifySignature(message, signature)) {
             log.error("Invalid signature. Expected signature for payload: [{}] with body: [{}]", message, body);
             throw new NotAuthorizedException("Invalid signature");
