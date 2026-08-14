@@ -5,8 +5,12 @@
     
     <appender name="JSON_CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
         <encoder class="net.logstash.logback.encoder.LogstashEncoder">
-            <!-- Include request_id from MDC -->
+            <!-- Include request_id and trace context from MDC -->
             <includeMdcKeyName>request_id</includeMdcKeyName>
+            <includeMdcKeyName>trace_id</includeMdcKeyName>
+            <includeMdcKeyName>span_id</includeMdcKeyName>
+            <includeMdcKeyName>traceId</includeMdcKeyName>
+            <includeMdcKeyName>spanId</includeMdcKeyName>
             <customFields>{"app_name":"wallet-service"}</customFields>
         </encoder>
     </appender>

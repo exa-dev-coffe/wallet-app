@@ -38,9 +38,16 @@ public class RequestIdFilter implements Filter {
         httpResponse.setHeader(REQUEST_ID_HEADER, requestId);
 
         try {
+            io.opentelemetry.api.trace.SpanContext spanContext = io.opentelemetry.api.trace.Span.current().getSpanContext();
+            if (spanContext.isValid()) {
+                MDC.put("trace_id", spanContext.getTraceId());
+                MDC.put("span_id", spanContext.getSpanId());
+            }
             chain.doFilter(request, response);
         } finally {
             MDC.remove(MDC_REQUEST_ID_KEY);
+            MDC.remove("trace_id");
+            MDC.remove("span_id");
         }
     }
 }
