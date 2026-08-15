@@ -114,5 +114,5 @@ jobs:
               wallet-service-coffe=ghcr.io/${{ github.repository_owner }}/wallet-service-coffe:${{ steps.vars.outputs.sha }}
 
             # Optional: show rollout
-            kubectl rollout status deployment/wallet-service-coffe -n dev-coffe
+            # kubectl rollout status deployment/wallet-service-coffe -n dev-coffe
           EOF
