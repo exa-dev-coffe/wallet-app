@@ -1,4 +1,4 @@
-package com.wallet_service.be.balance.dto;
+package com.wallet_service.be.utils.commons;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -11,12 +11,14 @@ import java.util.UUID;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class TopUpResponseDto {
-    private UUID balanceHistoryId;
-    private Double amount;
+public class MidtransChargeResponseDto {
+    private UUID orderId;
+    private Double grossAmount;
     private String paymentType;
     private String transactionStatus;
     private String transactionId;
+    private String statusCode;
+    private String statusMessage;
     private String bank;
     private String vaNumber;
     private String billKey;
@@ -25,10 +27,4 @@ public class TopUpResponseDto {
     private String qrString;
     private String deeplinkUrl;
     private String expiryTime;
-    private String redirectUrl;
-    private String token;
-    private String userEmail;
-    private String userName;
 }
-
-

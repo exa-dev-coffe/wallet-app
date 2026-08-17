@@ -58,8 +58,11 @@ public class BalancehistoryService {
         return ResponseEntity.ok(response);
     }
 
-    public UUID createBalanceHistory(BalanceModel balance, TypeBalanceHistory typeBalanceHistory, Double amount, String token, String redirectUrl, StatusBalanceHistory
-            statusBalanceHistory) {
+    public UUID createBalanceHistory(BalanceModel balance, TypeBalanceHistory typeBalanceHistory, Double amount, String token, String redirectUrl, StatusBalanceHistory statusBalanceHistory) {
+        return createBalanceHistory(balance, typeBalanceHistory, amount, token, redirectUrl, statusBalanceHistory, null, null);
+    }
+
+    public UUID createBalanceHistory(BalanceModel balance, TypeBalanceHistory typeBalanceHistory, Double amount, String token, String redirectUrl, StatusBalanceHistory statusBalanceHistory, String userEmail, String userName) {
         BalancehistoryModel balancehistoryModel = new BalancehistoryModel();
         balancehistoryModel.setBalance(balance);
         balancehistoryModel.setType(typeBalanceHistory);
@@ -67,11 +70,14 @@ public class BalancehistoryService {
         balancehistoryModel.setStatus(statusBalanceHistory);
         balancehistoryModel.setToken(token);
         balancehistoryModel.setRedirectUrl(redirectUrl);
+        balancehistoryModel.setUserEmail(userEmail);
+        balancehistoryModel.setUserName(userName);
         balancehistoryModel.setCreatedBy(balance.getUserId());
         balancehistoryModel.setUpdatedBy(balance.getUserId());
         balancehistoryRepository.save(balancehistoryModel);
         return balancehistoryModel.getId();
     }
+
 
     public void updateMidtransTokenAndRedirectUrl(UUID id, String token, String redirectUrl) {
         BalancehistoryModel balancehistoryModel = balancehistoryRepository.findById(id).orElse(null);
@@ -121,6 +127,32 @@ public class BalancehistoryService {
         }
     }
 
+    public void updateCoreApiPaymentDetails(UUID id, String paymentType, String bank, String vaNumber, String billKey, String billerCode, String qrUrl, String qrString, String deeplinkUrl, String expiryTime) {
+        BalancehistoryModel balancehistoryModel = balancehistoryRepository.findById(id).orElse(null);
+        if (balancehistoryModel != null) {
+            balancehistoryModel.setPaymentType(paymentType);
+            balancehistoryModel.setBank(bank);
+            balancehistoryModel.setVaNumber(vaNumber);
+            balancehistoryModel.setBillKey(billKey);
+            balancehistoryModel.setBillerCode(billerCode);
+            balancehistoryModel.setQrUrl(qrUrl);
+            balancehistoryModel.setQrString(qrString);
+            balancehistoryModel.setDeeplinkUrl(deeplinkUrl);
+            balancehistoryModel.setExpiryTime(expiryTime);
+            balancehistoryModel.setUpdatedAt(new Date());
+            balancehistoryRepository.save(balancehistoryModel);
+        }
+    }
+
+    public ResponseEntity<ResponseModel<BalanceHistoryResponseDto>> getBalanceHistoryDetail(UUID id, Integer userId) {
+        BalancehistoryModel balancehistoryModel = balancehistoryRepository.findById(id).orElse(null);
+        if (balancehistoryModel == null || balancehistoryModel.getBalance().getUserId() != userId) {
+            throw new BadRequestException("Balance history not found");
+        }
+        BalanceHistoryResponseDto responseData = BalanceHistoryResponseDto.fromEntity(balancehistoryModel);
+        return ResponseEntity.ok(new ResponseModel<>(true, "Balance history retrieved", responseData));
+    }
+
     public BalancehistoryModel getBalanceHistoryById(UUID id) {
         BalancehistoryModel balancehistoryModel = balancehistoryRepository.findById(id).orElse(null);
         if (balancehistoryModel == null) {
@@ -130,3 +162,4 @@ public class BalancehistoryService {
     }
 
 }
+

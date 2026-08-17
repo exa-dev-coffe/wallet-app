@@ -10,9 +10,13 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.repository.query.Param;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/1.0")
@@ -41,4 +45,14 @@ public class BalancehistoryRoute {
         return balancehistoryService.getAllBalanceHistory(adjustedPageable, searchValue, searchKey, currentUser.getUserId());
     }
 
+    @GetMapping("/balance-history/{id}")
+    @RequireAuth
+    public ResponseEntity<ResponseModel<BalanceHistoryResponseDto>> getBalanceHistoryDetail(
+            @PathVariable("id") UUID id,
+            @CurrentUser CurrentUserDto currentUser
+    ) {
+        return balancehistoryService.getBalanceHistoryDetail(id, currentUser.getUserId());
+    }
+
 }
+
