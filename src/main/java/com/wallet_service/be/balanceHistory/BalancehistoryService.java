@@ -83,6 +83,27 @@ public class BalancehistoryService {
         }
     }
 
+    public void publishBalanceHistoryUpdate(UUID balanceHistoryId, StatusBalanceHistory status, Integer userId) throws Exception {
+        BalanceHistoryPayloadDto payload = new BalanceHistoryPayloadDto();
+        payload.setType("update_balance_history");
+        payload.setStatus(status.name());
+        payload.setBalanceHistoryId(balanceHistoryId);
+        payload.setUserId(userId);
+
+        ObjectMapper mapper = new ObjectMapper();
+        String jsonMessage = mapper.writeValueAsString(payload);
+
+        rabbitmqService.sendToExchange(
+                "balance.history.updated",  // exchange
+                ExchangeType.DIRECT,
+                String.valueOf(userId),
+                jsonMessage,
+                false,
+                true,
+                null
+        );
+    }
+
     public void updateBalanceHistoryStatus(UUID id, StatusBalanceHistory statusBalanceHistory, Integer userId) throws Exception {
         BalancehistoryModel balancehistoryModel = balancehistoryRepository.findById(id).orElse(null);
         if (balancehistoryModel == null) {
@@ -93,25 +114,8 @@ public class BalancehistoryService {
             balancehistoryModel.setUpdatedAt(new Date());
             balancehistoryModel.setUpdatedBy(userId);
             balancehistoryRepository.save(balancehistoryModel);
-            BalanceHistoryPayloadDto payload = new BalanceHistoryPayloadDto();
-            payload.setType("update_balance_history");
-            payload.setStatus(statusBalanceHistory.name());
-            payload.setBalanceHistoryId(balancehistoryModel.getId());
-            payload.setUserId(userId);
-
-            ObjectMapper mapper = new ObjectMapper();
-            String jsonMessage = mapper.writeValueAsString(payload);
-
-            // example fanout
-            rabbitmqService.sendToExchange(
-                    "balance.history.updated",  // exchange
-                    ExchangeType.DIRECT,
-                    String.valueOf(userId),
-                    jsonMessage,
-                    false,
-                    true,
-                    null
-            );
+            
+            publishBalanceHistoryUpdate(balancehistoryModel.getId(), statusBalanceHistory, userId);
         } else {
             throw new BadRequestException("Balance history already processed");
         }

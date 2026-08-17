@@ -79,7 +79,9 @@ public class BalanceService {
         MidtransResponseDto res = midtransService.createTransaction(midtransRequestDto);
         if (res != null) {
             balancehistoryService.updateMidtransTokenAndRedirectUrl(balanceHistoryId, res.getToken(), res.getRedirectUrl());
-        }
+        }        
+
+        balancehistoryService.publishBalanceHistoryUpdate(balanceHistoryId, StatusBalanceHistory.PENDING, userId);
 
         TopUpResponseDto responseData = new TopUpResponseDto(res.getRedirectUrl(), res.getToken());
         ResponseModel<TopUpResponseDto> response = new ResponseModel<>(true, "Top up initiated successfully", responseData);
