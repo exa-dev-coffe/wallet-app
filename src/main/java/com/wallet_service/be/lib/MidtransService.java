@@ -129,5 +129,11 @@ public class MidtransService {
         }
         return StatusBalanceHistory.PENDING;
     }
+
+    public JSONObject checkTransactionStatus(String orderId) throws Exception {
+        JSONObject response = coreApi.checkTransaction(orderId);
+        log.info("Midtrans check transaction response: {}", response);
+        return response;
+    }
 }
 

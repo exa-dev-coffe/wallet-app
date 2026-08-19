@@ -15,6 +15,8 @@ import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.UUID;
+
 @RestController
 @RequestMapping("/api/1.0")
 public class BalanceRoute {
@@ -51,5 +53,10 @@ public class BalanceRoute {
         return balanceService.notificationMidtransHandler(midtransRequestDto.getOrderId(), status, midtransRequestDto.getStatusCode(), midtransRequestDto.getGrossAmount(), midtransRequestDto.getSignatureKey());
     }
 
+    @PostMapping("/balance/top-up/{id}/sync")
+    @RequireAuth
+    public ResponseEntity<ResponseModel<String>> syncTransactionStatus(@CurrentUser() CurrentUserDto currentUserDto, @PathVariable("id") UUID id) throws Exception {
+        return balanceService.syncTransactionStatus(id, currentUserDto.getUserId());
+    }
 
 }

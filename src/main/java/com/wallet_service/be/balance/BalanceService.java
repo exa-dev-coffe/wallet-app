@@ -20,6 +20,7 @@ import com.wallet_service.be.utils.commons.ResponseModel;
 import com.wallet_service.be.utils.enums.ExchangeType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
+import org.json.JSONObject;
 import jakarta.transaction.Transactional;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
@@ -219,4 +220,73 @@ public class BalanceService {
         }
     }
 
+    @Transactional(Transactional.TxType.REQUIRED)
+    public ResponseEntity<ResponseModel<String>> syncTransactionStatus(UUID id, int userId) throws Exception {
+        BalancehistoryModel balancehistoryModel = balancehistoryService.getBalanceHistoryById(id);
+        if (balancehistoryModel == null || balancehistoryModel.getBalance().getUserId() != userId) {
+            throw new NotFoundException("Transaction not found");
+        }
+
+        if (balancehistoryModel.getStatus() == StatusBalanceHistory.COMPLETED || balancehistoryModel.getStatus() == StatusBalanceHistory.FAILED) {
+            return ResponseEntity.ok(new ResponseModel<>(true, "Transaction already synced", null));
+        }
+
+        JSONObject midtransResponse = midtransService.checkTransactionStatus(id.toString());
+        String statusCode = midtransResponse.optString("status_code", "");
+        if (statusCode.equals("404")) {
+            return ResponseEntity.ok(new ResponseModel<>(true, "Transaction not found on Midtrans", null));
+        }
+
+        String transactionStatus = midtransResponse.optString("transaction_status", "pending");
+        String fraudStatus = midtransResponse.optString("fraud_status", "accept");
+
+        StatusBalanceHistory statusBalanceHistory = midtransService.mapTransactionStatus(transactionStatus, fraudStatus);
+
+        BalanceModel balance = balanceRepository.findById(balancehistoryModel.getBalance().getId()).orElse(null);
+        if (balance == null) {
+            throw new NotFoundException("Balance not found");
+        }
+
+        if (statusBalanceHistory != StatusBalanceHistory.COMPLETED) {
+            balancehistoryService.updateBalanceHistoryStatus(id, statusBalanceHistory, balance.getUserId());
+            return ResponseEntity.ok(new ResponseModel<>(true, "Sync successful, status updated to " + statusBalanceHistory.name(), null));
+        }
+
+        balance.setBalance(balance.getBalance() + balancehistoryModel.getAmount());
+        balanceRepository.save(balance);
+
+        balancehistoryService.updateBalanceHistoryStatus(id, statusBalanceHistory, balance.getUserId());
+
+        if (balancehistoryModel.getType() == TypeBalanceHistory.TOPUP && balancehistoryModel.getUserEmail() != null) {
+            try {
+                Map<String, Object> emailPayload = new HashMap<>();
+                emailPayload.put("to", balancehistoryModel.getUserEmail());
+                emailPayload.put("subject", "Coffe - Wallet Top Up Receipt");
+                emailPayload.put("userName", balancehistoryModel.getUserName() != null ? balancehistoryModel.getUserName() : "Customer");
+                emailPayload.put("amount", balancehistoryModel.getAmount());
+                emailPayload.put("paymentType", balancehistoryModel.getPaymentType() != null ? balancehistoryModel.getPaymentType() : "Core API");
+                emailPayload.put("bank", balancehistoryModel.getBank() != null ? balancehistoryModel.getBank() : "-");
+                emailPayload.put("transactionId", balancehistoryModel.getId().toString());
+                emailPayload.put("date", new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date()));
+
+                ObjectMapper mapper = new ObjectMapper();
+                String jsonMessage = mapper.writeValueAsString(emailPayload);
+
+                rabbitmqService.sendToExchange(
+                        "email.queue",
+                        ExchangeType.DIRECT,
+                        "emailQueue.topupReceipt",
+                        jsonMessage,
+                        true,
+                        false,
+                        null
+                );
+                log.info("Published top-up receipt to RabbitMQ for transaction {}", balancehistoryModel.getId());
+            } catch (Exception e) {
+                log.error("Failed to publish email receipt to RabbitMQ for transaction " + balancehistoryModel.getId(), e);
+            }
+        }
+
+        return ResponseEntity.ok(new ResponseModel<>(true, "Sync successful, status updated to COMPLETED", null));
+    }
 }
