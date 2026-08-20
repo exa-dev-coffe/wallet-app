@@ -9,6 +9,7 @@ import com.wallet_service.be.balanceHistory.enums.StatusBalanceHistory;
 import com.wallet_service.be.balanceHistory.enums.TypeBalanceHistory;
 import com.wallet_service.be.exception.BadRequestException;
 import com.wallet_service.be.exception.NotFoundException;
+import com.wallet_service.be.exception.TooManyRequestException;
 import com.wallet_service.be.lib.MidtransService;
 import com.wallet_service.be.lib.RabbitmqService;
 import com.wallet_service.be.utils.PasswordUtils;
@@ -22,6 +23,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.json.JSONObject;
 import jakarta.transaction.Transactional;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
@@ -40,12 +42,14 @@ public class BalanceService {
     private final MidtransService midtransService;
     private final BalancehistoryService balancehistoryService;
     private final RabbitmqService rabbitmqService;
+    private final RedisTemplate<String, Object> redisTemplate;
 
-    public BalanceService(BalanceRepository balanceRepository, MidtransService midtransService, BalancehistoryService balancehistoryService, RabbitmqService rabbitmqService) {
+    public BalanceService(BalanceRepository balanceRepository, MidtransService midtransService, BalancehistoryService balancehistoryService, RabbitmqService rabbitmqService, RedisTemplate<String, Object> redisTemplate) {
         this.balanceRepository = balanceRepository;
         this.balancehistoryService = balancehistoryService;
         this.midtransService = midtransService;
         this.rabbitmqService = rabbitmqService;
+        this.redisTemplate = redisTemplate;
     }
 
     public ResponseEntity<ResponseModel<GetBalanceResponseDto>> getBalanceByUserId(int userId) {
@@ -75,6 +79,110 @@ public class BalanceService {
         newBalance.setCreatedBy(userId);
         balanceRepository.save(newBalance);
         ResponseModel<String> response = new ResponseModel<>(true, "Pin set successfully", null);
+        return ResponseEntity.ok(response);
+    }
+
+    @Transactional(Transactional.TxType.REQUIRED)
+    public ResponseEntity<ResponseModel<String>> changePin(int userId, String oldPin, String newPin) {
+        BalanceModel balance = balanceRepository.findByUserId(userId);
+        if (balance == null || !balance.isActive()) {
+            throw new NotFoundException("Wallet belum diaktifkan");
+        }
+
+        if (!PasswordUtils.matches(oldPin, balance.getPin())) {
+            throw new BadRequestException("PIN saat ini salah");
+        }
+
+        balance.setPin(PasswordUtils.hashPassword(newPin));
+        balanceRepository.save(balance);
+
+        ResponseModel<String> response = new ResponseModel<>(true, "PIN berhasil diubah", null);
+        return ResponseEntity.ok(response);
+    }
+
+    public ResponseEntity<ResponseModel<String>> sendResetPinCode(int userId, String email) throws Exception {
+        BalanceModel balance = balanceRepository.findByUserId(userId);
+        if (balance == null || !balance.isActive()) {
+            throw new NotFoundException("Wallet belum diaktifkan");
+        }
+
+        if (email == null || email.trim().isEmpty()) {
+            throw new BadRequestException("Email tidak ditemukan");
+        }
+
+        String sendCountKey = "wallet:resetPin:sendCount:" + email;
+        Object countObj = redisTemplate.opsForValue().get(sendCountKey);
+        int count = 0;
+        if (countObj != null) {
+            if (countObj instanceof Integer) {
+                count = (Integer) countObj;
+            } else if (countObj instanceof Long) {
+                count = ((Long) countObj).intValue();
+            } else {
+                count = Integer.parseInt(countObj.toString());
+            }
+        }
+
+        if (count >= 3) {
+            throw new TooManyRequestException("Batas maksimum pengiriman kode verifikasi PIN (3 kali) hari ini telah tercapai.");
+        }
+
+        // Generate 6-digit OTP code
+        String code = String.format("%06d", (int) (Math.random() * 1000000));
+
+        // Store count with 24 hours expiry
+        if (countObj == null) {
+            redisTemplate.opsForValue().set(sendCountKey, 1, java.time.Duration.ofHours(24));
+        } else {
+            redisTemplate.opsForValue().set(sendCountKey, count + 1, java.time.Duration.ofHours(24));
+        }
+
+        // Store code in Redis with 10 mins expiry
+        String codeKey = "wallet:resetPin:code:" + email;
+        redisTemplate.opsForValue().set(codeKey, code, java.time.Duration.ofMinutes(10));
+
+        // Publish to rabbitmq queue emailQueue.resetPin
+        String jsonMessage = String.format("{\"to\":\"%s\",\"subject\":\"Kode Verifikasi Reset PIN Wallet - Diskusi Coffee\",\"code\":\"%s\"}", email, code);
+        this.rabbitmqService.sendMessage(
+                "Email Reset PIN Code",
+                "emailQueue.resetPin",
+                "email.queue",
+                ExchangeType.DIRECT,
+                null,
+                jsonMessage,
+                true,
+                false,
+                false,
+                null
+        );
+
+        ResponseModel<String> response = new ResponseModel<>(true, "Kode verifikasi reset PIN telah dikirim ke email Anda.", null);
+        return ResponseEntity.ok(response);
+    }
+
+    @Transactional(Transactional.TxType.REQUIRED)
+    public ResponseEntity<ResponseModel<String>> resetPin(int userId, String email, String code, String newPin) {
+        BalanceModel balance = balanceRepository.findByUserId(userId);
+        if (balance == null || !balance.isActive()) {
+            throw new NotFoundException("Wallet belum diaktifkan");
+        }
+
+        if (code == null || code.trim().isEmpty()) {
+            throw new BadRequestException("Kode verifikasi wajib diisi");
+        }
+
+        String codeKey = "wallet:resetPin:code:" + email;
+        Object savedCode = redisTemplate.opsForValue().get(codeKey);
+        if (savedCode == null || !savedCode.toString().equals(code)) {
+            throw new BadRequestException("Kode verifikasi salah atau telah kedaluwarsa");
+        }
+
+        balance.setPin(PasswordUtils.hashPassword(newPin));
+        balanceRepository.save(balance);
+
+        redisTemplate.delete(codeKey);
+
+        ResponseModel<String> response = new ResponseModel<>(true, "PIN wallet berhasil diperbarui", null);
         return ResponseEntity.ok(response);
     }
 

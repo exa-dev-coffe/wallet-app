@@ -2,7 +2,9 @@ package com.wallet_service.be.balance;
 
 import com.wallet_service.be.annotation.CurrentUser;
 import com.wallet_service.be.annotation.RequireAuth;
+import com.wallet_service.be.balance.dto.ChangePinRequestDto;
 import com.wallet_service.be.balance.dto.GetBalanceResponseDto;
+import com.wallet_service.be.balance.dto.ResetPinRequestDto;
 import com.wallet_service.be.balance.dto.SetPinRequestDto;
 import com.wallet_service.be.balance.dto.TopUpRequestDto;
 import com.wallet_service.be.balance.dto.TopUpResponseDto;
@@ -38,6 +40,24 @@ public class BalanceRoute {
     @RequireAuth
     public ResponseEntity<ResponseModel<String>> setPin(@CurrentUser() CurrentUserDto currentUserDto, @Valid @RequestBody SetPinRequestDto setPinRequest) {
         return balanceService.setPin(currentUserDto.getUserId(), setPinRequest.getPin());
+    }
+
+    @PostMapping("/balance/change-pin")
+    @RequireAuth
+    public ResponseEntity<ResponseModel<String>> changePin(@CurrentUser() CurrentUserDto currentUserDto, @Valid @RequestBody ChangePinRequestDto request) {
+        return balanceService.changePin(currentUserDto.getUserId(), request.getOldPin(), request.getNewPin());
+    }
+
+    @PostMapping("/balance/reset-pin/send-code")
+    @RequireAuth
+    public ResponseEntity<ResponseModel<String>> sendResetPinCode(@CurrentUser() CurrentUserDto currentUserDto) throws Exception {
+        return balanceService.sendResetPinCode(currentUserDto.getUserId(), currentUserDto.getEmail());
+    }
+
+    @PostMapping("/balance/reset-pin")
+    @RequireAuth
+    public ResponseEntity<ResponseModel<String>> resetPin(@CurrentUser() CurrentUserDto currentUserDto, @Valid @RequestBody ResetPinRequestDto request) {
+        return balanceService.resetPin(currentUserDto.getUserId(), currentUserDto.getEmail(), request.getCode(), request.getNewPin());
     }
 
     @PostMapping("/balance/top-up")
