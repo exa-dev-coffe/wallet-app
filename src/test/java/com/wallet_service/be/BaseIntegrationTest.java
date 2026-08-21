@@ -2,6 +2,7 @@ package com.wallet_service.be;
 
 import com.wallet_service.be.lib.MidtransService;
 import com.wallet_service.be.lib.RabbitmqService;
+import com.wallet_service.be.utils.HmacUtils;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -46,6 +47,9 @@ public abstract class BaseIntegrationTest {
     @Autowired
     protected MockMvc mockMvc;
 
+    @Autowired
+    protected HmacUtils hmacUtils;
+
     @MockBean
     protected RabbitmqService rabbitmqService;
 
@@ -68,5 +72,10 @@ public abstract class BaseIntegrationTest {
                 .setExpiration(new Date(now + 1000L * 60 * 60))
                 .signWith(new SecretKeySpec(jwtSecret.getBytes(StandardCharsets.UTF_8), SignatureAlgorithm.HS512.getJcaName()))
                 .compact();
+    }
+
+    public String createHmacSignature(String query, String timestamp, String body) throws Exception {
+        String message = (query == null ? "" : query) + timestamp + (body == null ? "" : body);
+        return hmacUtils.generateHMAC(message);
     }
 }
