@@ -69,4 +69,4 @@ Jalankan perintah berikut untuk menguji seluruh endpoint saldo, top-up, deduct, 
 ./mvnw test
 ```
 
-*Persyaratan:* Docker Desktop/Daemon harus aktif.
+*Requirement:* Docker Desktop/Daemon must be running.

@@ -57,7 +57,7 @@ public class MinioService {
             );
         } catch (Exception e) {
             log.error("Error delete file: {}", e.getMessage());
-            throw new BadRequestException("Gagal menghapus file");
+            throw new BadRequestException("Failed to delete file");
         }
     }
 }

@@ -86,28 +86,28 @@ public class BalanceService {
     public ResponseEntity<ResponseModel<String>> changePin(int userId, String oldPin, String newPin) {
         BalanceModel balance = balanceRepository.findByUserId(userId);
         if (balance == null || !balance.isActive()) {
-            throw new NotFoundException("Wallet belum diaktifkan");
+            throw new NotFoundException("Wallet not activated");
         }
 
         if (!PasswordUtils.matches(oldPin, balance.getPin())) {
-            throw new BadRequestException("PIN saat ini salah");
+            throw new BadRequestException("Current PIN is incorrect");
         }
 
         balance.setPin(PasswordUtils.hashPassword(newPin));
         balanceRepository.save(balance);
 
-        ResponseModel<String> response = new ResponseModel<>(true, "PIN berhasil diubah", null);
+        ResponseModel<String> response = new ResponseModel<>(true, "PIN changed successfully", null);
         return ResponseEntity.ok(response);
     }
 
     public ResponseEntity<ResponseModel<String>> sendResetPinCode(int userId, String email) throws Exception {
         BalanceModel balance = balanceRepository.findByUserId(userId);
         if (balance == null || !balance.isActive()) {
-            throw new NotFoundException("Wallet belum diaktifkan");
+            throw new NotFoundException("Wallet not activated");
         }
 
         if (email == null || email.trim().isEmpty()) {
-            throw new BadRequestException("Email tidak ditemukan");
+            throw new BadRequestException("Email not found");
         }
 
         String sendCountKey = "wallet:resetPin:sendCount:" + email;
@@ -124,7 +124,7 @@ public class BalanceService {
         }
 
         if (count >= 3) {
-            throw new TooManyRequestException("Batas maksimum pengiriman kode verifikasi PIN (3 kali) hari ini telah tercapai.");
+            throw new TooManyRequestException("Maximum limit of PIN verification code requests (3 times) for today has been reached.");
         }
 
         // Generate 6-digit OTP code
@@ -142,7 +142,7 @@ public class BalanceService {
         redisTemplate.opsForValue().set(codeKey, code, java.time.Duration.ofMinutes(10));
 
         // Publish to rabbitmq queue emailQueue.resetPin
-        String jsonMessage = String.format("{\"to\":\"%s\",\"subject\":\"Kode Verifikasi Reset PIN Wallet - Diskusi Coffee\",\"code\":\"%s\"}", email, code);
+        String jsonMessage = String.format("{\"to\":\"%s\",\"subject\":\"Wallet PIN Reset Verification Code - Diskusi Coffee\",\"code\":\"%s\"}", email, code);
         this.rabbitmqService.sendMessage(
                 "Email Reset PIN Code",
                 "emailQueue.resetPin",
@@ -156,7 +156,7 @@ public class BalanceService {
                 null
         );
 
-        ResponseModel<String> response = new ResponseModel<>(true, "Kode verifikasi reset PIN telah dikirim ke email Anda.", null);
+        ResponseModel<String> response = new ResponseModel<>(true, "PIN reset verification code has been sent to your email.", null);
         return ResponseEntity.ok(response);
     }
 
@@ -164,17 +164,17 @@ public class BalanceService {
     public ResponseEntity<ResponseModel<String>> resetPin(int userId, String email, String code, String newPin) {
         BalanceModel balance = balanceRepository.findByUserId(userId);
         if (balance == null || !balance.isActive()) {
-            throw new NotFoundException("Wallet belum diaktifkan");
+            throw new NotFoundException("Wallet not activated");
         }
 
         if (code == null || code.trim().isEmpty()) {
-            throw new BadRequestException("Kode verifikasi wajib diisi");
+            throw new BadRequestException("Verification code is required");
         }
 
         String codeKey = "wallet:resetPin:code:" + email;
         Object savedCode = redisTemplate.opsForValue().get(codeKey);
         if (savedCode == null || !savedCode.toString().equals(code)) {
-            throw new BadRequestException("Kode verifikasi salah atau telah kedaluwarsa");
+            throw new BadRequestException("Verification code is incorrect or has expired");
         }
 
         balance.setPin(PasswordUtils.hashPassword(newPin));
@@ -182,7 +182,7 @@ public class BalanceService {
 
         redisTemplate.delete(codeKey);
 
-        ResponseModel<String> response = new ResponseModel<>(true, "PIN wallet berhasil diperbarui", null);
+        ResponseModel<String> response = new ResponseModel<>(true, "Wallet PIN updated successfully", null);
         return ResponseEntity.ok(response);
     }
 

@@ -66,7 +66,7 @@ class WalletBalanceTest extends BaseIntegrationTest {
                         .content(requestBody))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.message").value("PIN berhasil diubah"));
+                .andExpect(jsonPath("$.message").value("PIN changed successfully"));
 
         // VERIFY REAL DATABASE UPDATE: Query PostgreSQL DB directly!
         BalanceModel updatedBalance = balanceRepository.findByUserId(testUserId);
@@ -84,7 +84,7 @@ class WalletBalanceTest extends BaseIntegrationTest {
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.message").value("Kode verifikasi reset PIN telah dikirim ke email Anda."));
+                .andExpect(jsonPath("$.message").value("PIN reset verification code has been sent to your email."));
 
         // STEP 2: READ REAL OTP CODE DIRECTLY FROM REDIS!
         String redisCodeKey = "wallet:resetPin:code:" + testEmail;
@@ -107,7 +107,7 @@ class WalletBalanceTest extends BaseIntegrationTest {
                         .content(resetRequestBody))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.message").value("PIN wallet berhasil diperbarui"));
+                .andExpect(jsonPath("$.message").value("Wallet PIN updated successfully"));
 
         // STEP 4: VERIFY REAL DATABASE & REDIS STATE
         BalanceModel updatedBalance = balanceRepository.findByUserId(testUserId);
@@ -133,6 +133,6 @@ class WalletBalanceTest extends BaseIntegrationTest {
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
                 .andExpect(status().isTooManyRequests())
                 .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.message").value("Batas maksimum pengiriman kode verifikasi PIN (3 kali) hari ini telah tercapai."));
+                .andExpect(jsonPath("$.message").value("Maximum limit of PIN verification code requests (3 times) for today has been reached."));
     }
 }
