@@ -61,12 +61,14 @@ public abstract class BaseIntegrationTest {
 
     public String generateTestToken(int userId, String email, String role) {
         long now = System.currentTimeMillis();
+        int roleId = "admin".equalsIgnoreCase(role) ? 1 : "barista".equalsIgnoreCase(role) ? 3 : 2;
         return Jwts.builder()
                 .setSubject(email)
                 .claim("userId", userId)
                 .claim("email", email)
                 .claim("fullName", "Test User")
                 .claim("role", role)
+                .claim("roleId", roleId)
                 .claim("type", "ACCESS")
                 .setIssuedAt(new Date(now))
                 .setExpiration(new Date(now + 1000L * 60 * 60))
