@@ -12,7 +12,7 @@ public class MidtransRequestDto {
     @JsonProperty("transaction_status")
     private String transactionStatus;
     @JsonProperty("order_id")
-    private UUID orderId;
+    private String orderId;
     @JsonProperty("gross_amount")
     private String grossAmount;
     @JsonProperty("payment_type")

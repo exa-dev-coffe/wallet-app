@@ -27,11 +27,13 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import java.text.SimpleDateFormat;
 import java.util.UUID;
+
 
 
 @Service
@@ -84,8 +86,9 @@ public class BalanceService {
 
     @Transactional(Transactional.TxType.REQUIRED)
     public ResponseEntity<ResponseModel<String>> changePin(int userId, String oldPin, String newPin) {
-        BalanceModel balance = balanceRepository.findByUserId(userId);
-        if (balance == null || !balance.isActive()) {
+        BalanceModel balance = balanceRepository.findByUserIdForUpdate(userId)
+                .orElseThrow(() -> new NotFoundException("Wallet not found"));
+        if (!balance.isActive()) {
             throw new NotFoundException("Wallet not activated");
         }
 
@@ -162,8 +165,9 @@ public class BalanceService {
 
     @Transactional(Transactional.TxType.REQUIRED)
     public ResponseEntity<ResponseModel<String>> resetPin(int userId, String email, String code, String newPin) {
-        BalanceModel balance = balanceRepository.findByUserId(userId);
-        if (balance == null || !balance.isActive()) {
+        BalanceModel balance = balanceRepository.findByUserIdForUpdate(userId)
+                .orElseThrow(() -> new NotFoundException("Wallet not found"));
+        if (!balance.isActive()) {
             throw new NotFoundException("Wallet not activated");
         }
 
@@ -249,22 +253,65 @@ public class BalanceService {
 
 
     @Transactional(Transactional.TxType.REQUIRED)
-    public ResponseEntity<ResponseModel<String>> notificationMidtransHandler(UUID id, StatusBalanceHistory statusBalanceHistory, String statusCode, String grossAmount, String signatureKey) throws Exception {
+    public ResponseEntity<ResponseModel<String>> notificationMidtransHandler(String orderId, StatusBalanceHistory statusBalanceHistory, String statusCode, String grossAmount, String signatureKey) throws Exception {
         boolean isValidSignature = midtransService.validateSignatureKey(
-                id, statusCode, grossAmount, signatureKey
-
+                orderId, statusCode, grossAmount, signatureKey
         );
         if (!isValidSignature) {
             throw new BadRequestException("Invalid signature key");
         }
 
-        BalancehistoryModel balancehistoryModel = balancehistoryService.getBalanceHistoryById(id);
+        // 1. Handle POS QRIS Payment (Order ID starts with "POS-")
+        if (orderId != null && orderId.startsWith("POS-")) {
+            if (statusBalanceHistory == StatusBalanceHistory.COMPLETED) {
+                try {
+                    Map<String, Object> posPayload = new HashMap<>();
+                    posPayload.put("orderRef", orderId);
+                    posPayload.put("paymentStatus", "PAID");
+                    posPayload.put("grossAmount", Double.parseDouble(grossAmount));
+                    posPayload.put("timestamp", Instant.now().toString());
 
-        BalanceModel balance = balanceRepository.findById(balancehistoryModel.getBalance().getId()).orElse(null);
+                    ObjectMapper mapper = new ObjectMapper();
+                    String jsonMessage = mapper.writeValueAsString(posPayload);
 
-        if (balance == null) {
-            throw new NotFoundException("Balance not found");
+                    rabbitmqService.sendToExchange(
+                            "pos.payment.settled",
+                            ExchangeType.DIRECT,
+                            "",
+                            jsonMessage,
+                            true,
+                            false,
+                            null
+                    );
+                    log.info("Published POS QRIS settlement to RabbitMQ for orderRef: {}", orderId);
+                } catch (Exception e) {
+                    log.error("Failed to publish POS QRIS settlement to RabbitMQ", e);
+                }
+            }
+            return ResponseEntity.ok(new ResponseModel<>(true, "POS notification processed", null));
         }
+
+        // 2. Handle Wallet Top-Up (UUID or TOPUP-UUID)
+        String cleanId = orderId != null && orderId.startsWith("TOPUP-") ? orderId.substring(6) : orderId;
+        UUID id;
+        try {
+            id = UUID.fromString(cleanId);
+        } catch (IllegalArgumentException e) {
+            throw new BadRequestException("Invalid order ID format");
+        }
+
+        BalancehistoryModel balancehistoryModel = balancehistoryService.getBalanceHistoryById(id);
+        if (balancehistoryModel == null) {
+            throw new NotFoundException("Transaction not found");
+        }
+
+        // Idempotency: Prevent double processing if already completed or failed
+        if (balancehistoryModel.getStatus() == StatusBalanceHistory.COMPLETED || balancehistoryModel.getStatus() == StatusBalanceHistory.FAILED) {
+            return ResponseEntity.ok(new ResponseModel<>(true, "Notification already processed", null));
+        }
+
+        BalanceModel balance = balanceRepository.findByIdForUpdate(balancehistoryModel.getBalance().getId())
+                .orElseThrow(() -> new NotFoundException("Balance not found"));
 
         if (statusBalanceHistory != StatusBalanceHistory.COMPLETED) {
             balancehistoryService.updateBalanceHistoryStatus(id, statusBalanceHistory, balance.getUserId());
@@ -307,13 +354,14 @@ public class BalanceService {
         }
 
         return ResponseEntity.ok(new ResponseModel<>(true, "Notification processed", null));
-
     }
 
+    @Transactional(Transactional.TxType.REQUIRED)
     public boolean pay(int userId, double amount, String pin) {
-        BalanceModel balance = balanceRepository.findByUserId(userId);
-        if (balance == null) {
-            throw new NotFoundException("Balance not found");
+        BalanceModel balance = balanceRepository.findByUserIdForUpdate(userId)
+                .orElseThrow(() -> new NotFoundException("Balance not found"));
+        if (!balance.isActive()) {
+            throw new BadRequestException("Wallet not activated");
         }
         if (!PasswordUtils.matches(pin, balance.getPin())) {
             throw new BadRequestException("Invalid pin");
@@ -350,10 +398,8 @@ public class BalanceService {
 
         StatusBalanceHistory statusBalanceHistory = midtransService.mapTransactionStatus(transactionStatus, fraudStatus);
 
-        BalanceModel balance = balanceRepository.findById(balancehistoryModel.getBalance().getId()).orElse(null);
-        if (balance == null) {
-            throw new NotFoundException("Balance not found");
-        }
+        BalanceModel balance = balanceRepository.findByIdForUpdate(balancehistoryModel.getBalance().getId())
+                .orElseThrow(() -> new NotFoundException("Balance not found"));
 
         if (statusBalanceHistory != StatusBalanceHistory.COMPLETED) {
             balancehistoryService.updateBalanceHistoryStatus(id, statusBalanceHistory, balance.getUserId());
@@ -396,5 +442,157 @@ public class BalanceService {
         }
 
         return ResponseEntity.ok(new ResponseModel<>(true, "Sync successful, status updated to COMPLETED", null));
+    }
+
+    public ResponseEntity<ResponseModel<com.wallet_service.be.balance.dto.GeneratePosCodeResponseDto>> generatePosPaymentCode(int userId, String pin, String email, String fullName) {
+        BalanceModel balance = balanceRepository.findByUserId(userId);
+        if (balance == null || !balance.isActive()) {
+            throw new NotFoundException("Wallet not activated");
+        }
+
+        if (!PasswordUtils.matches(pin, balance.getPin())) {
+            throw new BadRequestException("Invalid PIN");
+        }
+
+        // Generate 6-digit payment code (e.g. 100000 - 999999)
+        String code = String.format("%06d", (int) (100000 + Math.random() * 900000));
+        String codeKey = "wallet:pos_code:" + code;
+
+        // Store payload in Redis with 5 minutes (300 seconds) expiry
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("userId", userId);
+        payload.put("email", email != null ? email : "");
+        payload.put("fullName", fullName != null ? fullName : "");
+
+        try {
+            ObjectMapper mapper = new ObjectMapper();
+            String jsonPayload = mapper.writeValueAsString(payload);
+            redisTemplate.opsForValue().set(codeKey, jsonPayload, java.time.Duration.ofMinutes(5));
+        } catch (Exception e) {
+            log.error("Failed to serialize POS payment code payload", e);
+            throw new BadRequestException("Failed to generate payment code");
+        }
+
+        com.wallet_service.be.balance.dto.GeneratePosCodeResponseDto responseData = com.wallet_service.be.balance.dto.GeneratePosCodeResponseDto.builder()
+                .paymentCode(code)
+                .expiresInSeconds(300)
+                .currentBalance(balance.getBalance())
+                .userName(fullName)
+                .userEmail(email)
+                .build();
+
+        return ResponseEntity.ok(new ResponseModel<>(true, "Payment code generated successfully", responseData));
+    }
+
+    @Transactional(Transactional.TxType.REQUIRED)
+    public com.wallet_service.be.internal.dto.PosWalletPayResponseDto payWithPosCode(String paymentCode, double amount, Long orderId) {
+        if (paymentCode == null || paymentCode.trim().isEmpty()) {
+            throw new BadRequestException("Payment code is required");
+        }
+
+        String codeKey = "wallet:pos_code:" + paymentCode.trim();
+        Object payloadObj = redisTemplate.opsForValue().get(codeKey);
+        if (payloadObj == null) {
+            throw new BadRequestException("Invalid or expired payment code. Please ask customer to generate a new code.");
+        }
+
+        int userId;
+        String email = "";
+        String fullName = "Customer";
+        try {
+            ObjectMapper mapper = new ObjectMapper();
+            Map<String, Object> payloadMap = mapper.readValue(payloadObj.toString(), Map.class);
+            userId = ((Number) payloadMap.get("userId")).intValue();
+            if (payloadMap.get("email") != null) email = payloadMap.get("email").toString();
+            if (payloadMap.get("fullName") != null) fullName = payloadMap.get("fullName").toString();
+        } catch (Exception e) {
+            log.error("Failed to parse POS payment code payload", e);
+            throw new BadRequestException("Failed to process payment code");
+        }
+
+        BalanceModel balance = balanceRepository.findByUserIdForUpdate(userId)
+                .orElseThrow(() -> new NotFoundException("Customer wallet not found"));
+        if (!balance.isActive()) {
+            throw new BadRequestException("Customer wallet is inactive");
+        }
+
+        if (balance.getBalance() < amount) {
+            throw new BadRequestException(String.format("Insufficient customer wallet balance. Current: Rp %.2f, Required: Rp %.2f", balance.getBalance(), amount));
+        }
+
+        balance.setBalance(balance.getBalance() - amount);
+        balanceRepository.save(balance);
+
+        UUID historyId = balancehistoryService.createBalanceHistory(balance, TypeBalanceHistory.PAYMENT, amount, null, null, StatusBalanceHistory.COMPLETED, email, fullName);
+
+        // Publish RabbitMQ SSE event so customer frontend updates wallet balance & history in real-time
+        try {
+            balancehistoryService.publishBalanceHistoryUpdate(historyId, StatusBalanceHistory.COMPLETED, userId);
+        } catch (Exception e) {
+            log.error("Failed to publish balance history SSE update event for userId={}", userId, e);
+        }
+
+        // Delete (burn) payment code immediately so it cannot be re-used
+        redisTemplate.delete(codeKey);
+
+        return com.wallet_service.be.internal.dto.PosWalletPayResponseDto.builder()
+                .success(true)
+                .userId(userId)
+                .customerName(fullName)
+                .customerEmail(email)
+                .amountPaid(amount)
+                .remainingBalance(balance.getBalance())
+                .message("Payment successful")
+                .build();
+    }
+
+    public com.wallet_service.be.internal.dto.PosQrisChargeResponseDto chargePosQris(com.wallet_service.be.internal.dto.PosQrisChargeRequestDto requestDto) throws Exception {
+        MidtransChargeRequestDto chargeRequestDto = MidtransChargeRequestDto.builder()
+                .customOrderId(requestDto.getOrderId())
+                .grossAmount(requestDto.getGrossAmount())
+                .firstName(requestDto.getCustomerName() != null ? requestDto.getCustomerName() : "POS Guest")
+                .email(requestDto.getCustomerEmail() != null ? requestDto.getCustomerEmail() : "pos@diskusicoffee.com")
+                .paymentType("qris")
+                .build();
+
+        MidtransChargeResponseDto res = midtransService.chargeTransaction(chargeRequestDto);
+
+        return com.wallet_service.be.internal.dto.PosQrisChargeResponseDto.builder()
+                .orderId(requestDto.getOrderId())
+                .grossAmount(requestDto.getGrossAmount())
+                .qrString(res != null ? res.getQrString() : null)
+                .qrUrl(res != null ? res.getQrUrl() : null)
+                .expiryTime(res != null ? res.getExpiryTime() : null)
+                .transactionStatus(res != null ? res.getTransactionStatus() : "pending")
+                .transactionId(res != null ? res.getTransactionId() : null)
+                .build();
+    }
+
+    public JSONObject checkPosQrisStatus(String orderId) throws Exception {
+        return midtransService.checkTransactionStatus(orderId);
+    }
+
+    @Transactional(Transactional.TxType.REQUIRED)
+    public boolean refundPosWallet(Integer userId, Double amount, Long orderId) {
+        if (userId == null || userId <= 0 || amount == null || amount <= 0) {
+            return false;
+        }
+        BalanceModel balance = balanceRepository.findByUserIdForUpdate(userId)
+                .orElse(null);
+        if (balance == null) {
+            return false;
+        }
+        balance.setBalance(balance.getBalance() + amount);
+        balanceRepository.save(balance);
+        UUID historyId = balancehistoryService.createBalanceHistory(balance, TypeBalanceHistory.TOPUP, amount, null, null, StatusBalanceHistory.COMPLETED, null, "POS Auto Refund (Order #" + orderId + ")");
+        
+        try {
+            balancehistoryService.publishBalanceHistoryUpdate(historyId, StatusBalanceHistory.COMPLETED, userId);
+        } catch (Exception e) {
+            log.error("Failed to publish balance history SSE update event for refund userId={}", userId, e);
+        }
+
+        log.info("Auto-refunded Rp {} to user {} for failed POS transaction {}", amount, userId, orderId);
+        return true;
     }
 }

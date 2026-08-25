@@ -15,6 +15,7 @@ import java.util.UUID;
 @AllArgsConstructor
 public class MidtransChargeRequestDto {
     private UUID orderId;
+    private String customOrderId;
     private Double grossAmount;
     private String firstName;
     private String email;
@@ -24,8 +25,12 @@ public class MidtransChargeRequestDto {
     public Map<String, Object> toMap() {
         Map<String, Object> map = new HashMap<>();
 
+        String finalOrderId = (customOrderId != null && !customOrderId.isBlank())
+                ? customOrderId
+                : (orderId != null ? orderId.toString() : "");
+
         Map<String, Object> transactionDetails = new HashMap<>();
-        transactionDetails.put("order_id", orderId.toString());
+        transactionDetails.put("order_id", finalOrderId);
         transactionDetails.put("gross_amount", grossAmount.longValue());
         map.put("transaction_details", transactionDetails);
 

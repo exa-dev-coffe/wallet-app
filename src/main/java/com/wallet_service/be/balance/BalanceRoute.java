@@ -60,6 +60,12 @@ public class BalanceRoute {
         return balanceService.resetPin(currentUserDto.getUserId(), currentUserDto.getEmail(), request.getCode(), request.getNewPin());
     }
 
+    @PostMapping("/balance/generate-pos-code")
+    @RequireAuth
+    public ResponseEntity<ResponseModel<com.wallet_service.be.balance.dto.GeneratePosCodeResponseDto>> generatePosCode(@CurrentUser() CurrentUserDto currentUserDto, @Valid @RequestBody com.wallet_service.be.balance.dto.GeneratePosCodeRequestDto request) {
+        return balanceService.generatePosPaymentCode(currentUserDto.getUserId(), request.getPin(), currentUserDto.getEmail(), currentUserDto.getFullName());
+    }
+
     @PostMapping("/balance/top-up")
     @RequireAuth
     public ResponseEntity<ResponseModel<TopUpResponseDto>> topUpBalance(@CurrentUser() CurrentUserDto currentUserDto, @Valid @RequestBody TopUpRequestDto topUpRequestDto) throws Exception {

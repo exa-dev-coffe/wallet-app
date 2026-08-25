@@ -40,7 +40,7 @@ public class MidtransService {
         }
 
         MidtransChargeResponseDto.MidtransChargeResponseDtoBuilder builder = MidtransChargeResponseDto.builder()
-                .orderId(chargeRequestDto.getOrderId())
+                .orderId(chargeRequestDto.getCustomOrderId() != null ? null : chargeRequestDto.getOrderId())
                 .grossAmount(chargeRequestDto.getGrossAmount())
                 .paymentType(response.optString("payment_type", chargeRequestDto.getPaymentType()))
                 .transactionStatus(response.optString("transaction_status", "pending"))
@@ -107,7 +107,7 @@ public class MidtransService {
         );
     }
 
-    public boolean validateSignatureKey(UUID orderId, String statusCode, String grossAmount, String signatureKey) {
+    public boolean validateSignatureKey(String orderId, String statusCode, String grossAmount, String signatureKey) {
         String input = orderId + statusCode + grossAmount + serverKey;
         String generatedSignatureKey = org.apache.commons.codec.digest.DigestUtils.sha512Hex(input);
         return generatedSignatureKey.equals(signatureKey);
