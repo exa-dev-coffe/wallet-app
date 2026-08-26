@@ -1,6 +1,7 @@
 package com.wallet_service.be.security;
 
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wallet_service.be.annotation.RequireAuth;
 import com.wallet_service.be.annotation.RequirePermission;
@@ -8,18 +9,28 @@ import com.wallet_service.be.annotation.RequireRole;
 import com.wallet_service.be.exception.ForbiddenException;
 import com.wallet_service.be.exception.NotAuthorizedException;
 import com.wallet_service.be.lib.JwtService;
+import com.wallet_service.be.utils.HmacUtils;
 import com.wallet_service.be.utils.commons.PermissionActionDto;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.http.HttpServletRequest;
+import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Component;
 
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Date;
 import java.util.Map;
 
+@Slf4j
 @Aspect
 @Component
 public class JwtFilter {
@@ -27,12 +38,21 @@ public class JwtFilter {
     private final HttpServletRequest request;
     private final RedisTemplate<String, Object> redisTemplate;
     private final ObjectMapper objectMapper;
+    private final HmacUtils hmacUtils;
+    private final String accountServiceUrl;
 
-    public JwtFilter(JwtService jwtService, HttpServletRequest request, RedisTemplate<String, Object> redisTemplate, ObjectMapper objectMapper) {
+    public JwtFilter(JwtService jwtService,
+                     HttpServletRequest request,
+                     RedisTemplate<String, Object> redisTemplate,
+                     ObjectMapper objectMapper,
+                     HmacUtils hmacUtils,
+                     @Value("${app.account-service.url:http://localhost:8080}") String accountServiceUrl) {
         this.jwtService = jwtService;
         this.request = request;
         this.redisTemplate = redisTemplate;
         this.objectMapper = objectMapper;
+        this.hmacUtils = hmacUtils;
+        this.accountServiceUrl = accountServiceUrl;
     }
 
     @Around("@annotation(requireAuth)")
@@ -106,7 +126,12 @@ public class JwtFilter {
                 permissions = objectMapper.readValue(jsonString, new TypeReference<Map<String, PermissionActionDto>>() {});
             }
         } catch (Exception e) {
-            // Ignore redis cache error and fall through
+            log.warn("Redis error fetching role_permissions for key: {}, falling back to account-service", key, e);
+        }
+
+        // Cache miss or Redis error: Fallback to Account Service internal API
+        if (permissions == null) {
+            permissions = fetchPermissionsFromAccountService(roleId);
         }
 
         if (permissions == null) {
@@ -133,4 +158,54 @@ public class JwtFilter {
 
         return pjp.proceed();
     }
-}
+
+    private Map<String, PermissionActionDto> fetchPermissionsFromAccountService(int roleId) {
+        try {
+            String timestamp = Instant.now().toString();
+            String signature = hmacUtils.generateHMAC(timestamp);
+
+            HttpClient client = HttpClient.newBuilder()
+                    .connectTimeout(Duration.ofSeconds(3))
+                    .build();
+
+            String url = accountServiceUrl + "/api/internal/roles/" + roleId + "/permissions";
+
+            HttpRequest req = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .header("X-Signature", signature)
+                    .header("X-Timestamp", timestamp)
+                    .GET()
+                    .timeout(Duration.ofSeconds(3))
+                    .build();
+
+            HttpResponse<String> resp = client.send(req, HttpResponse.BodyHandlers.ofString());
+
+            if (resp.statusCode() == 200 && resp.body() != null) {
+                JsonNode jsonNode = objectMapper.readTree(resp.body());
+                if (jsonNode.has("data") && jsonNode.get("data").isObject()) {
+                    String dataJson = jsonNode.get("data").toString();
+                    Map<String, PermissionActionDto> perms = objectMapper.readValue(
+                            dataJson,
+                            new TypeReference<Map<String, PermissionActionDto>>() {}
+                    );
+
+                    // Warm Redis cache (TTL 24h)
+                    try {
+                        String key = "auth:role_permissions:" + roleId;
+                        redisTemplate.opsForValue().set(key, dataJson, Duration.ofHours(24));
+                    } catch (Exception e) {
+                        log.warn("Failed to warm Redis cache for role_permissions: {}", roleId, e);
+                    }
+
+                    return perms;
+                }
+            } else {
+                log.warn("Failed internal request to account-service for role permissions. URL: {}, Status: {}", url, resp.statusCode());
+            }
+        } catch (Exception e) {
+            log.error("Failed to fetch role permissions from account-service for roleId: {}", roleId, e);
+        }
+        return null;
+    }
+}
+
