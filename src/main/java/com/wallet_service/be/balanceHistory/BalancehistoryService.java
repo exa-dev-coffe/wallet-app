@@ -54,12 +54,15 @@ public class BalancehistoryService {
 
         PaginationResponseDto<BalanceHistoryResponseDto> responsePagination = PaginationResponseDto.fromEntity(responseData);
 
-        ResponseModel<PaginationResponseDto<BalanceHistoryResponseDto>> response = new ResponseModel<>(true, "Data Balance history ditemukan", responsePagination);
+        ResponseModel<PaginationResponseDto<BalanceHistoryResponseDto>> response = new ResponseModel<>(true, "Balance history data found", responsePagination);
         return ResponseEntity.ok(response);
     }
 
-    public UUID createBalanceHistory(BalanceModel balance, TypeBalanceHistory typeBalanceHistory, Double amount, String token, String redirectUrl, StatusBalanceHistory
-            statusBalanceHistory) {
+    public UUID createBalanceHistory(BalanceModel balance, TypeBalanceHistory typeBalanceHistory, Double amount, String token, String redirectUrl, StatusBalanceHistory statusBalanceHistory) {
+        return createBalanceHistory(balance, typeBalanceHistory, amount, token, redirectUrl, statusBalanceHistory, null, null);
+    }
+
+    public UUID createBalanceHistory(BalanceModel balance, TypeBalanceHistory typeBalanceHistory, Double amount, String token, String redirectUrl, StatusBalanceHistory statusBalanceHistory, String userEmail, String userName) {
         BalancehistoryModel balancehistoryModel = new BalancehistoryModel();
         balancehistoryModel.setBalance(balance);
         balancehistoryModel.setType(typeBalanceHistory);
@@ -67,11 +70,14 @@ public class BalancehistoryService {
         balancehistoryModel.setStatus(statusBalanceHistory);
         balancehistoryModel.setToken(token);
         balancehistoryModel.setRedirectUrl(redirectUrl);
+        balancehistoryModel.setUserEmail(userEmail);
+        balancehistoryModel.setUserName(userName);
         balancehistoryModel.setCreatedBy(balance.getUserId());
         balancehistoryModel.setUpdatedBy(balance.getUserId());
         balancehistoryRepository.save(balancehistoryModel);
         return balancehistoryModel.getId();
     }
+
 
     public void updateMidtransTokenAndRedirectUrl(UUID id, String token, String redirectUrl) {
         BalancehistoryModel balancehistoryModel = balancehistoryRepository.findById(id).orElse(null);
@@ -81,6 +87,27 @@ public class BalancehistoryService {
             balancehistoryModel.setUpdatedAt(new Date());
             balancehistoryRepository.save(balancehistoryModel);
         }
+    }
+
+    public void publishBalanceHistoryUpdate(UUID balanceHistoryId, StatusBalanceHistory status, Integer userId) throws Exception {
+        BalanceHistoryPayloadDto payload = new BalanceHistoryPayloadDto();
+        payload.setType("update_balance_history");
+        payload.setStatus(status.name());
+        payload.setBalanceHistoryId(balanceHistoryId);
+        payload.setUserId(userId);
+
+        ObjectMapper mapper = new ObjectMapper();
+        String jsonMessage = mapper.writeValueAsString(payload);
+
+        rabbitmqService.sendToExchange(
+                "balance.history.updated",  // exchange
+                ExchangeType.DIRECT,
+                String.valueOf(userId),
+                jsonMessage,
+                false,
+                true,
+                null
+        );
     }
 
     public void updateBalanceHistoryStatus(UUID id, StatusBalanceHistory statusBalanceHistory, Integer userId) throws Exception {
@@ -93,28 +120,37 @@ public class BalancehistoryService {
             balancehistoryModel.setUpdatedAt(new Date());
             balancehistoryModel.setUpdatedBy(userId);
             balancehistoryRepository.save(balancehistoryModel);
-            BalanceHistoryPayloadDto payload = new BalanceHistoryPayloadDto();
-            payload.setType("update_balance_history");
-            payload.setStatus(statusBalanceHistory.name());
-            payload.setBalanceHistoryId(balancehistoryModel.getId());
-            payload.setUserId(userId);
-
-            ObjectMapper mapper = new ObjectMapper();
-            String jsonMessage = mapper.writeValueAsString(payload);
-
-            // example fanout
-            rabbitmqService.sendToExchange(
-                    "balance.history.updated",  // exchange
-                    ExchangeType.DIRECT,
-                    String.valueOf(userId),
-                    jsonMessage,
-                    false,
-                    true,
-                    null
-            );
+            
+            publishBalanceHistoryUpdate(balancehistoryModel.getId(), statusBalanceHistory, userId);
         } else {
             throw new BadRequestException("Balance history already processed");
         }
+    }
+
+    public void updateCoreApiPaymentDetails(UUID id, String paymentType, String bank, String vaNumber, String billKey, String billerCode, String qrUrl, String qrString, String deeplinkUrl, String expiryTime) {
+        BalancehistoryModel balancehistoryModel = balancehistoryRepository.findById(id).orElse(null);
+        if (balancehistoryModel != null) {
+            balancehistoryModel.setPaymentType(paymentType);
+            balancehistoryModel.setBank(bank);
+            balancehistoryModel.setVaNumber(vaNumber);
+            balancehistoryModel.setBillKey(billKey);
+            balancehistoryModel.setBillerCode(billerCode);
+            balancehistoryModel.setQrUrl(qrUrl);
+            balancehistoryModel.setQrString(qrString);
+            balancehistoryModel.setDeeplinkUrl(deeplinkUrl);
+            balancehistoryModel.setExpiryTime(expiryTime);
+            balancehistoryModel.setUpdatedAt(new Date());
+            balancehistoryRepository.save(balancehistoryModel);
+        }
+    }
+
+    public ResponseEntity<ResponseModel<BalanceHistoryResponseDto>> getBalanceHistoryDetail(UUID id, Integer userId) {
+        BalancehistoryModel balancehistoryModel = balancehistoryRepository.findById(id).orElse(null);
+        if (balancehistoryModel == null || balancehistoryModel.getBalance().getUserId() != userId) {
+            throw new BadRequestException("Balance history not found");
+        }
+        BalanceHistoryResponseDto responseData = BalanceHistoryResponseDto.fromEntity(balancehistoryModel);
+        return ResponseEntity.ok(new ResponseModel<>(true, "Balance history retrieved", responseData));
     }
 
     public BalancehistoryModel getBalanceHistoryById(UUID id) {
@@ -126,3 +162,4 @@ public class BalancehistoryService {
     }
 
 }
+

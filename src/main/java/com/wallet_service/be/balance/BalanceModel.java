@@ -18,6 +18,9 @@ public class BalanceModel extends BaseModal {
     @Column(name = "user_id", nullable = false)
     private int userId;
 
+    @Column(name = "wallet_number", length = 30)
+    private String walletNumber;
+
     @Column(name = "balance", nullable = false, columnDefinition = "DECIMAL(10, 2) DEFAULT 0.00")
     private double balance;
 
@@ -26,4 +29,11 @@ public class BalanceModel extends BaseModal {
 
     @Column(name = "pin", nullable = false)
     private String pin;
+
+    public String getWalletNumber() {
+        if (walletNumber == null || walletNumber.trim().isEmpty()) {
+            return String.format("8839%08d", userId);
+        }
+        return walletNumber;
+    }
 }

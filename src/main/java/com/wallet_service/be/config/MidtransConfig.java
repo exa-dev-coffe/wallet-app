@@ -2,6 +2,7 @@ package com.wallet_service.be.config;
 
 import com.midtrans.Config;
 import com.midtrans.ConfigFactory;
+import com.midtrans.service.MidtransCoreApi;
 import com.midtrans.service.MidtransSnapApi;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -19,15 +20,22 @@ public class MidtransConfig {
     @Value("${midtrans.override-notification}")
     private String overrideNotification;
 
-
-    @Bean
-    public MidtransSnapApi snapApi() {
-        Config config = Config.builder()
+    private Config buildConfig() {
+        return Config.builder()
                 .setServerKey(serverKey)
                 .setClientKey(clientKey)
                 .setIsProduction(isProduction)
                 .setPaymentOverrideNotification(overrideNotification)
                 .build();
-        return new ConfigFactory(config).getSnapApi();
     }
-}
+
+    @Bean
+    public MidtransCoreApi coreApi() {
+        return new ConfigFactory(buildConfig()).getCoreApi();
+    }
+
+    @Bean
+    public MidtransSnapApi snapApi() {
+        return new ConfigFactory(buildConfig()).getSnapApi();
+    }
+}

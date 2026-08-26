@@ -42,4 +42,39 @@ public class BalancehistoryModel extends BaseModal {
 
     @Column(name = "redirect_url", nullable = true)
     private String redirectUrl;
+
+    @Column(name = "payment_type", nullable = true)
+    private String paymentType;
+
+    @Column(name = "bank", nullable = true)
+    private String bank;
+
+    @Column(name = "va_number", nullable = true)
+    private String vaNumber;
+
+    @Column(name = "bill_key", nullable = true)
+    private String billKey;
+
+    @Column(name = "biller_code", nullable = true)
+    private String billerCode;
+
+    @Column(name = "qr_url", columnDefinition = "TEXT", nullable = true)
+    private String qrUrl;
+
+    @Column(name = "qr_string", columnDefinition = "TEXT", nullable = true)
+    private String qrString;
+
+    @Column(name = "deeplink_url", columnDefinition = "TEXT", nullable = true)
+    private String deeplinkUrl;
+
+    @Column(name = "expiry_time", nullable = true)
+    private String expiryTime;
+
+    @Column(name = "user_email", nullable = true)
+    private String userEmail;
+
+    @Column(name = "user_name", nullable = true)
+    private String userName;
 }
+
+
