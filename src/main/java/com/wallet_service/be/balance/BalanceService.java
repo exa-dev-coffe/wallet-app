@@ -63,6 +63,11 @@ public class BalanceService {
         GetBalanceResponseDto responseData = new GetBalanceResponseDto();
         responseData.setIsActive(balance.getIsActive());
         responseData.setBalance(balance.getBalance());
+        String walletNum = balance.getWalletNumber();
+        if (walletNum == null || walletNum.trim().isEmpty()) {
+            walletNum = String.format("8839%08d", userId);
+        }
+        responseData.setWalletNumber(walletNum);
         ResponseModel<GetBalanceResponseDto> response = new ResponseModel<>(true, "Balance retrieved successfully", responseData);
         return ResponseEntity.ok(response);
     }
@@ -71,10 +76,14 @@ public class BalanceService {
     public ResponseEntity<ResponseModel<String>> setPin(int userId, String pin) {
         BalanceModel balance = balanceRepository.findByUserId(userId);
         if (balance != null) {
+            if (!balance.isActive()) {
+                throw new BadRequestException("Your wallet has been suspended by Admin. Please contact customer support or administrator to re-activate your wallet.");
+            }
             throw new BadRequestException("Pin already exists");
         }
         BalanceModel newBalance = new BalanceModel();
         newBalance.setUserId(userId);
+        newBalance.setWalletNumber(String.format("8839%08d", userId));
         newBalance.setPin(PasswordUtils.hashPassword(pin));
         newBalance.setBalance(0.0);
         newBalance.setActive(true);
@@ -105,8 +114,11 @@ public class BalanceService {
 
     public ResponseEntity<ResponseModel<String>> sendResetPinCode(int userId, String email) throws Exception {
         BalanceModel balance = balanceRepository.findByUserId(userId);
-        if (balance == null || !balance.isActive()) {
+        if (balance == null) {
             throw new NotFoundException("Wallet not activated");
+        }
+        if (!balance.isActive()) {
+            throw new BadRequestException("Your wallet has been suspended by Admin. Please contact customer support or administrator to re-activate your wallet.");
         }
 
         if (email == null || email.trim().isEmpty()) {
@@ -168,7 +180,7 @@ public class BalanceService {
         BalanceModel balance = balanceRepository.findByUserIdForUpdate(userId)
                 .orElseThrow(() -> new NotFoundException("Wallet not found"));
         if (!balance.isActive()) {
-            throw new NotFoundException("Wallet not activated");
+            throw new BadRequestException("Your wallet has been suspended by Admin. Please contact customer support or administrator to re-activate your wallet.");
         }
 
         if (code == null || code.trim().isEmpty()) {

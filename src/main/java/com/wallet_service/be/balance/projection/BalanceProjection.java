@@ -5,4 +5,6 @@ public interface BalanceProjection {
     Boolean getIsActive();
 
     Double getBalance();
+
+    String getWalletNumber();
 }
